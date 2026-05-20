@@ -1,0 +1,1464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VVE Voting</title>
+<style>
+  :root {
+    --bg: #f0ebe4;
+    --surface: #ffffff;
+    --ink: #231f20;
+    --muted: #4f5b5f;
+    --line: #e3ddd2;
+    --line-strong: #bcb2a3;
+    --primary: #dd5331;
+    --primary-ink: #ffffff;
+    --ok: #2e6b3a;
+    --ok-soft: #e6efe7;
+    --warn: #b26a00;
+    --warn-soft: #fbf1e0;
+    --bad: #d20019;
+    --bad-soft: #fbe6e6;
+    --amber: #e8a52f;
+    --shadow: 0 1px 2px rgba(35,31,32,.05), 0 6px 18px rgba(35,31,32,.06);
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 18px;
+    line-height: 1.45;
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  .app { max-width: 1100px; margin: 0 auto; padding: 0 20px 80px; }
+  header.topbar {
+    display: flex; align-items: center; gap: 16px;
+    padding: 16px 24px; background: var(--surface); border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 10;
+  }
+  header.topbar .logo {
+    font-weight: 800; font-size: 20px; cursor: pointer;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--ink);
+    padding: 6px 12px; border-radius: 6px;
+    transition: background .12s;
+  }
+  header.topbar .logo:hover { background: #f6f1e8; }
+  header.topbar .logo .accent { color: var(--primary); }
+  header.topbar .home-btn {
+    border: 1px solid var(--line-strong); background: var(--surface);
+    padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: 600;
+    cursor: pointer; min-height: 0;
+    color: var(--primary);
+  }
+  header.topbar .home-btn:hover { background: #f6e7df; }
+  header.topbar .crumb { color: var(--muted); }
+  header.topbar .spacer { flex: 1; }
+  header.topbar .savedhint { font-size: 14px; color: var(--ok); }
+  h1 { font-size: 28px; margin: 24px 0 8px; }
+  h2 { font-size: 22px; margin: 20px 0 8px; }
+  h3 { font-size: 18px; margin: 16px 0 6px; }
+  p { margin: 8px 0; }
+  .muted { color: var(--muted); }
+  .small { font-size: 14px; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .grow { flex: 1; }
+
+  button, .btn {
+    font: inherit; cursor: pointer; border: 1px solid var(--line-strong);
+    background: var(--surface); color: var(--ink); padding: 12px 18px;
+    border-radius: var(--radius); min-height: 48px; min-width: 48px;
+    transition: background .12s, border-color .12s, transform .04s;
+  }
+  button:hover, .btn:hover { background: #f6f1e8; }
+  button:active, .btn:active { transform: translateY(1px); }
+  button:disabled, .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-primary { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); font-weight: 600; }
+  .btn-primary:hover { background: #c4421f; border-color: #c4421f; }
+  .btn-big { font-size: 20px; padding: 16px 24px; min-height: 56px; }
+  .btn-danger { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); }
+  .btn-danger:hover { background: #fbd9d6; }
+  .btn-ok { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+  .btn-ok:hover { background: #d6eedd; }
+  .btn-link { background: none; border: none; color: var(--primary); text-decoration: underline; min-height: 0; min-width: 0; padding: 4px 6px; }
+
+  input[type="text"], input[type="number"], input[type="date"], select, textarea {
+    font: inherit; padding: 10px 12px; border: 1px solid var(--line-strong);
+    border-radius: 8px; background: white; color: var(--ink); min-height: 44px; width: 100%;
+  }
+  textarea { min-height: 80px; resize: vertical; }
+  label { display: block; font-weight: 600; margin: 12px 0 4px; }
+  label .req { color: var(--bad); }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin: 12px 0;
+  }
+
+  .stepbar {
+    display: flex; gap: 4px; margin: 16px 0 8px; font-size: 15px;
+    border-bottom: 1px solid var(--line);
+  }
+  .stepbar .step {
+    flex: 1; text-align: center; padding: 12px 8px;
+    border-bottom: 3px solid transparent; color: var(--muted);
+    cursor: pointer; user-select: none;
+    border-radius: 6px 6px 0 0;
+    transition: background .12s, color .12s, border-color .12s;
+    margin-bottom: -1px;
+  }
+  .stepbar .step:hover { background: #e0d4bf; border-bottom-color: var(--line-strong); }
+  .stepbar .step.active { color: var(--primary); border-color: var(--primary); font-weight: 700; background: var(--surface); }
+  .stepbar .step.active:hover { background: var(--surface); border-bottom-color: var(--primary); }
+  .stepbar .step.done { color: var(--ok); }
+
+  table.t { width: 100%; border-collapse: collapse; }
+  table.t th, table.t td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  table.t th { background: #faf6ee; font-size: 14px; color: var(--muted); font-weight: 600; }
+  table.t tr:hover td { background: #fdfbf6; }
+  table.t input[type="text"], table.t input[type="number"] { min-height: 36px; padding: 6px 8px; }
+
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+  .badge.ok { background: var(--ok-soft); color: var(--ok); }
+  .badge.bad { background: var(--bad-soft); color: var(--bad); }
+  .badge.warn { background: var(--warn-soft); color: var(--warn); }
+  .badge.muted { background: #eef0f3; color: var(--muted); }
+
+  .pill {
+    display: inline-block; padding: 6px 12px; background: #f6e7df; color: var(--primary);
+    border-radius: 999px; font-weight: 600; font-size: 14px;
+  }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; }
+  .kv b { color: var(--muted); font-weight: 600; }
+
+  .toast-wrap { position: fixed; top: 12px; right: 12px; z-index: 100; display: flex; flex-direction: column; gap: 6px; }
+  .toast {
+    background: var(--ink); color: white; padding: 10px 16px; border-radius: 8px;
+    box-shadow: var(--shadow); font-size: 15px; animation: tin .2s ease-out;
+  }
+  @keyframes tin { from { opacity: 0; transform: translateY(-8px);} to {opacity: 1; transform: none;} }
+
+  .banner {
+    border-radius: var(--radius); padding: 14px 16px; margin: 12px 0;
+    border-left: 6px solid;
+  }
+  .banner.ok { background: var(--ok-soft); border-color: var(--ok); }
+  .banner.bad { background: var(--bad-soft); border-color: var(--bad); }
+  .banner.warn { background: var(--warn-soft); border-color: var(--warn); }
+
+  .quorum-bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .quorum-bar .progress { flex: 1; min-width: 220px; height: 14px; background: #eef0f3; border-radius: 999px; overflow: hidden; }
+  .quorum-bar .progress > div { height: 100%; background: var(--ok); transition: width .3s; }
+  .quorum-bar.short .progress > div { background: var(--warn); }
+
+  .owners-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px;
+  }
+  .owner-card {
+    border: 1px solid var(--line); border-radius: 8px; padding: 12px;
+    background: var(--surface); display: flex; gap: 12px; align-items: center;
+  }
+  .owner-card.present { border-color: var(--ok); background: var(--ok-soft); }
+  .owner-card.present .num { color: var(--ok); }
+  .owner-card.proxied { border-color: var(--ok); background: #f1f7f2; }
+  .owner-card.proxied .num { color: var(--ok); }
+  .owner-card.proxied .proxy-via { display: inline-block; margin-top: 4px; color: var(--ok); font-size: 13px; font-weight: 600; }
+  .owner-card .num { font-weight: 800; font-size: 20px; min-width: 56px; }
+  .owner-card .name { font-size: 14px; line-height: 1.3; color: var(--muted); }
+  .owner-card .frac { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .owner-card .ctrl { margin-left: auto; }
+  .switch {
+    appearance: none; width: 52px; height: 30px; background: var(--line);
+    border-radius: 999px; position: relative; cursor: pointer; transition: background .15s;
+    border: none; outline: none;
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 3px; left: 3px;
+    width: 24px; height: 24px; background: white; border-radius: 50%;
+    transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2);
+  }
+  .switch:checked { background: var(--ok); }
+  .switch:checked::after { left: 25px; }
+
+  .vote-buttons { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .vote-buttons button { font-weight: 700; }
+  .vote-buttons button.agree.sel { background: var(--ok); color: white; border-color: var(--ok); }
+  .vote-buttons button.disagree.sel { background: var(--bad); color: white; border-color: var(--bad); }
+  .vote-buttons button.majority.sel { background: var(--amber); color: #4a2c00; border-color: var(--amber); }
+
+  .stacked-bar {
+    display: flex; height: 28px; border-radius: 6px; overflow: hidden;
+    background: #eef0f3; font-size: 13px; font-weight: 700;
+  }
+  .stacked-bar .seg { display: flex; align-items: center; justify-content: center; color: white; white-space: nowrap; }
+  .stacked-bar .seg.agree { background: var(--ok); }
+  .stacked-bar .seg.disagree { background: var(--bad); }
+  .stacked-bar .seg.majority { background: var(--amber); color: #4a2c00; }
+  .stacked-bar .seg.absent { background: #b8bfc9; }
+
+  .result-card { padding: 18px; margin-top: 14px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); }
+  .result-card.approved { border-color: var(--ok); }
+  .result-card.rejected { border-color: var(--bad); }
+  .result-card .verdict {
+    display: inline-block; padding: 8px 16px; font-weight: 800; border-radius: 999px;
+    font-size: 16px; letter-spacing: .5px;
+  }
+  .result-card.approved .verdict { background: var(--ok); color: white; }
+  .result-card.rejected .verdict { background: var(--bad); color: white; }
+
+  .ballot-picker {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 6px;
+  }
+  .ballot-picker button {
+    padding: 12px 6px; font-weight: 700; font-size: 18px;
+  }
+  .ballot-picker button.done { background: var(--ok-soft); color: var(--ok); border-color: var(--ok); }
+  .ballot-picker button.absent { opacity: .35; cursor: not-allowed; }
+  .ballot-picker button.proxy { border-color: var(--primary); color: var(--primary); }
+
+  .resolution-block {
+    border: 1px solid var(--line-strong); border-radius: 12px; padding: 22px 22px 18px;
+    margin: 24px 0; background: var(--surface); box-shadow: 0 1px 3px rgba(35,31,32,.04), 0 4px 14px rgba(35,31,32,.05);
+    position: relative;
+  }
+  .resolution-block::before {
+    content: attr(data-index);
+    position: absolute; top: -12px; left: 18px;
+    background: var(--primary); color: white;
+    font-weight: 800; font-size: 13px; letter-spacing: .06em;
+    padding: 3px 12px; border-radius: 999px;
+    box-shadow: 0 1px 2px rgba(35,31,32,.12);
+  }
+  .resolution-block .res-title {
+    font-size: 19px; font-weight: 600; padding: 12px 14px; min-height: 50px;
+  }
+  .resolution-block .res-desc-label {
+    font-size: 14px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .04em;
+    margin: 14px 0 4px;
+  }
+  .resolution-block textarea { background: #faf7f1; }
+  .resolution-block .res-controls { display: flex; gap: 6px; }
+  .resolution-block .res-controls button { padding: 8px 12px; min-height: 40px; }
+  .resolution-block .res-2_3 {
+    margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line);
+  }
+  .resolution-block .res-2_3 label { display: inline-flex; align-items: center; gap: 10px; margin: 0; cursor: pointer; }
+  .resolution-block .res-2_3 input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary); }
+  .resolution-block .res-2_3 .res-threshold {
+    margin-top: 10px; padding-left: 30px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    color: var(--muted); font-size: 15px;
+  }
+  .resolution-block .res-2_3 .res-threshold select { min-height: 36px; padding: 4px 10px; width: auto; }
+
+  .audit-row { display: grid; grid-template-columns: 160px 140px 1fr; gap: 8px; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 14px; }
+  .audit-row code { background: #eef0f3; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+
+  details > summary { cursor: pointer; padding: 6px 0; font-weight: 600; }
+
+  details.kebab { position: relative; }
+  details.kebab > summary {
+    list-style: none; cursor: pointer; user-select: none;
+    padding: 0; min-height: 48px; min-width: 48px;
+    border: 1px solid var(--line-strong); border-radius: var(--radius);
+    background: var(--surface);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 22px; color: var(--muted);
+    line-height: 1;
+  }
+  details.kebab > summary::-webkit-details-marker { display: none; }
+  details.kebab > summary::marker { content: ''; }
+  details.kebab > summary:hover { background: #f6f1e8; }
+  .kebab-menu {
+    position: absolute; right: 0; top: calc(100% + 4px);
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 6px; min-width: 220px; z-index: 20;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .kebab-menu button {
+    text-align: left; border: none; background: transparent;
+    padding: 10px 14px; cursor: pointer; min-height: 40px;
+    border-radius: 4px; font-size: 15px;
+    color: var(--ink); min-width: 0; font-weight: 500;
+  }
+  .kebab-menu button:hover { background: #f6f1e8; }
+  .kebab-menu button.danger { color: var(--bad); }
+  .kebab-menu button.danger:hover { background: var(--bad-soft); }
+
+  .session-locked input, .session-locked textarea, .session-locked select { pointer-events: none; background: #faf7f1; color: var(--muted); }
+  .session-locked button:not([data-action="session-tab"]):not([data-action="goto-home"]):not([data-action="export-csv"]):not([data-action="export-audit-csv"]):not([data-action="back-to-picker"]):not([data-action="pick-ballot"]):not([data-action="reopen-session"]) {
+    pointer-events: none; opacity: 0.5;
+  }
+  .session-locked .switch { pointer-events: none; opacity: 0.55; }
+
+  @media (max-width: 600px) {
+    body { font-size: 16px; }
+    .app { padding: 0 12px 60px; }
+    h1 { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="logo" data-action="goto-home" title="Go to Home">Peak <span class="accent">VVE</span> Voting</div>
+  <button class="home-btn" id="home-btn" data-action="goto-home" style="display:none">← Home</button>
+  <div class="crumb small" id="crumb"></div>
+  <div class="spacer"></div>
+  <div class="savedhint" id="savedhint"></div>
+</header>
+
+<div class="app" id="app"></div>
+<div class="toast-wrap" id="toast"></div>
+
+<script>
+/* ---------- SEED DATA ---------- */
+// Intentionally empty so this file can be safely hosted on a public site.
+// Owners are loaded from a file the board distributes separately.
+const SEED_OWNERS = [];
+
+/* ---------- STORAGE ---------- */
+const STORE_KEY = "vve.v1";
+const Storage = {
+  load() {
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch(e) { console.warn("load failed", e); }
+    return null;
+  },
+  save(data) {
+    localStorage.setItem(STORE_KEY, JSON.stringify(data));
+    Saved.touch();
+  },
+  reset() { localStorage.removeItem(STORE_KEY); }
+};
+
+const Saved = {
+  ts: null,
+  touch() { Saved.ts = Date.now(); Saved.render(); },
+  render() {
+    const el = document.getElementById('savedhint');
+    if (!el) return;
+    if (!Saved.ts) { el.textContent = ''; return; }
+    const secs = Math.round((Date.now() - Saved.ts) / 1000);
+    el.textContent = secs < 3 ? '✓ Saved' : `✓ Saved ${secs}s ago`;
+  }
+};
+setInterval(() => Saved.render(), 2000);
+
+/* ---------- STATE ---------- */
+const State = {
+  data: null,           // { owners, sessions, settings }
+  view: 'home',         // home | owners | new | session
+  params: {},
+  sessionView: 'setup', // setup | checkin | vote | results | audit
+  voteHouse: null,
+  checkInSearch: '',
+  init() {
+    let d = Storage.load();
+    if (!d) {
+      d = {
+        owners: structuredClone(SEED_OWNERS),
+        sessions: [],
+        settings: { quorumFraction: 2/3, twoThirdsBase: "present" }
+      };
+      Storage.save(d);
+    }
+    State.data = d;
+  },
+  persist() { Storage.save(State.data); }
+};
+
+/* ---------- UTIL ---------- */
+const uid = () => crypto.randomUUID ? crypto.randomUUID() : ('id-' + Date.now() + '-' + Math.random().toString(36).slice(2,8));
+const fmt = n => Number(n).toLocaleString('en-US');
+const pad2 = n => String(n).padStart(2, '0');
+const localDate = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+const localStamp = (d = new Date()) => `${localDate(d)}-${pad2(d.getHours())}-${pad2(d.getMinutes())}-${pad2(d.getSeconds())}`;
+const esc = s => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+const toast = (msg, kind='ok') => {
+  const w = document.getElementById('toast');
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  if (kind === 'bad') t.style.background = 'var(--bad)';
+  if (kind === 'warn') t.style.background = 'var(--warn)';
+  w.appendChild(t);
+  setTimeout(() => t.remove(), 2400);
+};
+const confirmModal = (msg) => window.confirm(msg);
+
+/* ---------- CALCULATIONS ---------- */
+const Calc = {
+  totalFraction(owners) { return owners.reduce((s, o) => s + (Number(o.fraction)||0), 0); },
+  ownerByHouse(owners, h) { return owners.find(o => Number(o.houseNumber) === Number(h)); },
+  presentFraction(session, owners) {
+    // an owner counts as "present" if they're marked present OR they're proxied to someone who IS present
+    let sum = 0;
+    for (const o of owners) {
+      const a = session.attendance[o.houseNumber] || {};
+      if (a.present) { sum += o.fraction; continue; }
+      if (a.proxy) {
+        const pa = session.attendance[a.proxy];
+        if (pa && pa.present) sum += o.fraction;
+      }
+    }
+    return sum;
+  },
+  presentCount(session, owners) {
+    let n = 0;
+    for (const o of owners) {
+      const a = session.attendance[o.houseNumber] || {};
+      if (a.present) { n++; continue; }
+      if (a.proxy) {
+        const pa = session.attendance[a.proxy];
+        if (pa && pa.present) n++;
+      }
+    }
+    return n;
+  },
+  quorumReached(session, owners, settings) {
+    const T = Calc.totalFraction(owners);
+    const P = Calc.presentFraction(session, owners);
+    const threshold = (settings.quorumFraction || 2/3) * T;
+    return { P, T, threshold, reached: P >= threshold };
+  },
+  // returns who can be voted for (owners present in person OR via proxy held by someone present)
+  votersFor(session, owners) {
+    return owners.filter(o => {
+      const a = session.attendance[o.houseNumber] || {};
+      if (a.present) return true;
+      if (a.proxy) {
+        const pa = session.attendance[a.proxy];
+        if (pa && pa.present) return true;
+      }
+      return false;
+    });
+  },
+  // who holds the vote for a given house? (the house itself if present, else its proxy)
+  voteHeldBy(session, houseNumber) {
+    const a = session.attendance[houseNumber];
+    if (!a) return null;
+    if (a.present) return houseNumber;
+    if (a.proxy && session.attendance[a.proxy] && session.attendance[a.proxy].present) return a.proxy;
+    return null;
+  },
+  resolutionTally(session, owners, resolutionId) {
+    let A = 0, D = 0, M = 0;
+    const voters = Calc.votersFor(session, owners);
+    for (const o of voters) {
+      const v = (session.votes[o.houseNumber] || {})[resolutionId];
+      if (v === 'agree') A += o.fraction;
+      else if (v === 'disagree') D += o.fraction;
+      else if (v === 'majority') M += o.fraction;
+    }
+    const cast = A + D + M;
+    const present = Calc.presentFraction(session, owners);
+    return { A, D, M, cast, present };
+  },
+  resolutionVerdict(session, owners, settings, resolution) {
+    const t = Calc.resolutionTally(session, owners, resolution.id);
+    const { A, D, M, cast, present } = t;
+    const q = Calc.quorumReached(session, owners, settings);
+    let winnerSide = (A === D) ? 'TIE' : (A > D ? 'AGREE' : 'DISAGREE');
+    let winningTotal = (winnerSide === 'AGREE') ? (A + M) : (winnerSide === 'DISAGREE') ? (D + M) : (A + M);
+    let losingTotal  = (winnerSide === 'AGREE') ? D : (winnerSide === 'DISAGREE') ? A : D;
+
+    let verdict, reason;
+    if (resolution.requires2_3) {
+      if (!q.reached) {
+        verdict = 'POSTPONED';
+        reason = 'Quorum (2/3 presence) was not reached.';
+      } else {
+        const base = (resolution.thresholdBase === 'cast') ? cast
+                   : (resolution.thresholdBase === 'total') ? q.T
+                   : present;
+        const threshold = (2/3) * base;
+        const baseLabel = (resolution.thresholdBase === 'cast') ? 'votes cast'
+                        : (resolution.thresholdBase === 'total') ? 'all owners'
+                        : 'present fraction';
+        if (winnerSide === 'AGREE' && winningTotal >= threshold) {
+          verdict = 'APPROVED';
+          reason = `Agree+Majority (${fmt(winningTotal)}) ≥ 2/3 of ${baseLabel} (${fmt(base)}) = ${threshold.toFixed(2)}.`;
+        } else {
+          verdict = 'REJECTED';
+          if (winnerSide !== 'AGREE') reason = `Disagree side leads (${fmt(D + M)} vs ${fmt(A)}).`;
+          else reason = `Agree+Majority (${fmt(winningTotal)}) < 2/3 of ${baseLabel} (${fmt(base)}) = ${threshold.toFixed(2)}.`;
+        }
+      }
+    } else {
+      if (cast === 0) { verdict = 'REJECTED'; reason = 'No votes cast.'; }
+      else if (winnerSide === 'AGREE' && winningTotal > losingTotal) {
+        verdict = 'APPROVED';
+        reason = `Agree+Majority (${fmt(winningTotal)}) > Disagree (${fmt(D)}).`;
+      } else if (winnerSide === 'DISAGREE') {
+        verdict = 'REJECTED';
+        reason = `Disagree+Majority (${fmt(winningTotal)}) > Agree (${fmt(A)}).`;
+      } else {
+        verdict = 'REJECTED';
+        reason = `Tied (${fmt(A)} vs ${fmt(D)}).`;
+      }
+    }
+    return { tally: t, winnerSide, winningTotal, losingTotal, verdict, reason, quorum: q };
+  }
+};
+
+/* ---------- AUDIT ---------- */
+const Audit = {
+  log(session, action, payload) {
+    if (!session.auditLog) session.auditLog = [];
+    session.auditLog.push({ ts: new Date().toISOString(), action, payload });
+  }
+};
+
+/* ---------- SESSION ACTIONS ---------- */
+const Actions = {
+  newSession(title, date) {
+    const today = localDate();
+    const id = (date || today) + '-' + uid().slice(0,6);
+    const s = {
+      id, title: title || 'VVE Meeting', date: date || today,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), closedAt: null,
+      status: 'setup',
+      resolutions: [],
+      attendance: {},
+      votes: {},
+      entryMode: 'per-ballot',
+      auditLog: []
+    };
+    Audit.log(s, 'session.create', { title: s.title, date: s.date });
+    State.data.sessions.unshift(s);
+    State.persist();
+    return s;
+  },
+  deleteSession(id) {
+    State.data.sessions = State.data.sessions.filter(s => s.id !== id);
+    State.persist();
+  },
+  getSession(id) { return State.data.sessions.find(s => s.id === id); },
+  updateSession(s, fn) {
+    fn(s);
+    s.updatedAt = new Date().toISOString();
+    State.persist();
+  }
+};
+
+/* ---------- VIEWS ---------- */
+const Views = {
+
+home() {
+  if (!State.data.owners || State.data.owners.length === 0) {
+    return `
+      <h1>Welcome</h1>
+      <div class="card">
+        <h2 style="margin-top:0">First step: load the owner list</h2>
+        <p>This tool needs the VVE owner data (house numbers, owner names, voting fractions) before you can run a meeting. The board distributes this as a file.</p>
+        <p>Pick the file you received to get started.</p>
+        <div class="row" style="margin-top:18px">
+          <label class="btn btn-primary btn-big" for="import-owners-file">Choose owner file…</label>
+          <input type="file" id="import-owners-file" accept="application/json" style="display:none" data-action="import-owners-file">
+          <label class="btn btn-big" for="restore-from-home" style="font-weight:normal">Or load a full backup</label>
+          <input type="file" id="restore-from-home" accept="application/json" style="display:none" data-action="import-owners-file">
+        </div>
+        <p class="small muted" style="margin-top:16px">Don't have one? Ask the board for the VVE owner data file.</p>
+      </div>
+    `;
+  }
+  const T = Calc.totalFraction(State.data.owners);
+  const list = State.data.sessions.map(s => {
+    let badge = '';
+    if (s.status === 'closed') {
+      const all = s.resolutions.map(r => Calc.resolutionVerdict(s, State.data.owners, State.data.settings, r));
+      const approved = all.filter(v => v.verdict === 'APPROVED').length;
+      badge = `<span class="badge ok">${approved}/${s.resolutions.length} approved</span>`;
+    } else if (s.status === 'voting') {
+      badge = `<span class="badge warn">Voting</span>`;
+    } else if (s.status === 'checkin') {
+      badge = `<span class="badge warn">Check-in</span>`;
+    } else {
+      badge = `<span class="badge muted">Setup</span>`;
+    }
+    return `
+      <div class="card row">
+        <div class="grow">
+          <div><b>${esc(s.title)}</b> &nbsp; <span class="muted small">${esc(s.date)}</span></div>
+          <div class="small muted">${s.resolutions.length} resolution${s.resolutions.length===1?'':'s'} • ${badge}</div>
+        </div>
+        <button class="btn btn-primary" data-action="open-session" data-id="${s.id}">Open</button>
+        <details class="kebab">
+          <summary title="More actions">⋮</summary>
+          <div class="kebab-menu">
+            <button data-action="view-audit" data-id="${s.id}">View audit log</button>
+            <button data-action="export-session-by-id" data-id="${s.id}">Save to file</button>
+            <button class="danger" data-action="delete-session" data-id="${s.id}">Delete</button>
+          </div>
+        </details>
+      </div>`;
+  }).join('') || `<p class="muted">No sessions yet.</p>`;
+
+  return `
+    <h1>Meetings</h1>
+    <p class="muted">${State.data.owners.length} owners · total voting fraction <b>${fmt(T)}</b>.</p>
+    <div class="row">
+      <button class="btn btn-primary btn-big" data-action="goto-new">+ New voting session</button>
+      <button class="btn" data-action="goto-owners">Manage owners</button>
+      <button class="btn" data-action="goto-importexport">Save / Load all data</button>
+    </div>
+    <div class="row" style="margin-top:28px; align-items:center">
+      <h2 style="margin:0">Past & current sessions</h2>
+      <div class="spacer grow"></div>
+      <label class="btn small" for="import-session-file" title="Add a session that someone shared with you" style="display:inline-flex;align-items:center">Open session from file…</label>
+      <input type="file" id="import-session-file" accept="application/json" style="display:none" data-action="import-session-file">
+    </div>
+    ${list}
+  `;
+},
+
+owners() {
+  const T = Calc.totalFraction(State.data.owners);
+  const rows = State.data.owners.map(o => `
+    <tr>
+      <td><input type="number" data-edit-owner="${o.houseNumber}" data-field="houseNumber" value="${o.houseNumber}" style="width:80px"></td>
+      <td><input type="number" data-edit-owner="${o.houseNumber}" data-field="buildingNumber" value="${o.buildingNumber ?? ''}" style="width:70px"></td>
+      <td><input type="text" data-edit-owner="${o.houseNumber}" data-field="displayName" value="${esc(o.displayName)}"></td>
+      <td><input type="number" data-edit-owner="${o.houseNumber}" data-field="fraction" value="${o.fraction}" style="width:90px"></td>
+      <td><button class="btn btn-danger small" data-action="delete-owner" data-id="${o.houseNumber}">Delete</button></td>
+    </tr>`).join('');
+
+  return `
+    <h1>Owners & voting fractions</h1>
+    <div class="banner ok"><b>Total voting fraction: ${fmt(T)}</b> (across ${State.data.owners.length} entries)</div>
+    <p class="muted small">Edits are saved automatically. Change a fraction only when ownership changes.</p>
+    <table class="t">
+      <thead><tr><th>House #</th><th>Bldg #</th><th>Owner / Name</th><th>Fraction</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="row" style="margin-top:16px">
+      <button class="btn" data-action="add-owner">+ Add owner</button>
+      <label class="btn" for="import-owners-on-owners-page">Replace owners from file…</label>
+      <input type="file" id="import-owners-on-owners-page" accept="application/json" style="display:none" data-action="import-owners-file">
+      <button class="btn btn-link" data-action="goto-home">← Back</button>
+    </div>
+  `;
+},
+
+newSession() {
+  const today = localDate();
+  return `
+    <h1>New voting session</h1>
+    <div class="card">
+      <label>Meeting title</label>
+      <input type="text" id="new-title" placeholder="VVE meeting at PEAK NOORDERPLASSEN" value="VVE meeting at PEAK NOORDERPLASSEN">
+      <label>Date</label>
+      <input type="date" id="new-date" value="${today}">
+      <div class="row" style="margin-top:16px">
+        <button class="btn btn-primary btn-big" data-action="create-session">Create session →</button>
+        <button class="btn btn-link" data-action="goto-home">Cancel</button>
+      </div>
+    </div>
+  `;
+},
+
+stepBar(active) {
+  const steps = [
+    { k: 'setup',   l: '① Setup' },
+    { k: 'checkin', l: '② Check-in' },
+    { k: 'vote',    l: '③ Enter votes' },
+    { k: 'results', l: '④ Results' }
+  ];
+  const idx = steps.findIndex(s => s.k === active);
+  return `<div class="stepbar">${steps.map((s,i) =>
+    `<div class="step ${i===idx?'active':i<idx?'done':''}" data-action="session-tab" data-tab="${s.k}">${s.l}</div>`
+  ).join('')}</div>`;
+},
+
+session() {
+  const s = Actions.getSession(State.params.id);
+  if (!s) return `<p>Session not found.</p><button class="btn" data-action="goto-home">Home</button>`;
+  let body = '';
+  switch (State.sessionView) {
+    case 'setup':   body = Views.setupSession(s); break;
+    case 'checkin': body = Views.checkin(s); break;
+    case 'vote':    body = Views.voteEntry(s); break;
+    case 'results': body = Views.results(s); break;
+    case 'audit':   body = Views.audit(s); break;
+  }
+  const closedBanner = s.status === 'closed' ? `
+    <div class="banner warn" style="position:sticky; top:72px; z-index:6">
+      <div class="row">
+        <div class="grow"><b>🔒 This session is closed</b> — read-only. Closed ${s.closedAt ? new Date(s.closedAt).toLocaleString() : ''}.</div>
+        <button class="btn btn-primary" data-action="reopen-session">Reopen to edit</button>
+      </div>
+    </div>` : '';
+  return `
+    <h1>${esc(s.title)} <span class="muted small">— ${esc(s.date)}</span></h1>
+    ${Views.stepBar(State.sessionView)}
+    ${closedBanner}
+    <div class="${s.status==='closed' ? 'session-locked' : ''}">${body}</div>
+  `;
+},
+
+setupSession(s) {
+  const meta = `
+    <div class="card">
+      <h2 style="margin-top:0">Meeting details</h2>
+      <div class="row" style="align-items:flex-end">
+        <div class="grow">
+          <label>Meeting title</label>
+          <input type="text" data-edit-session="title" value="${esc(s.title)}">
+        </div>
+        <div style="min-width:200px">
+          <label>Date</label>
+          <input type="date" data-edit-session="date" value="${esc(s.date)}">
+        </div>
+      </div>
+    </div>
+  `;
+  const rows = s.resolutions.map((r, i) => `
+    <div class="resolution-block" data-index="${i+1}">
+      <div class="row" style="align-items:center">
+        <input type="text" class="res-title grow" data-edit-res="${r.id}" data-field="title" value="${esc(r.title)}" placeholder="Resolution title">
+        <div class="res-controls">
+          <button class="btn small" data-action="move-res" data-id="${r.id}" data-dir="-1" ${i===0?'disabled':''} title="Move up">↑</button>
+          <button class="btn small" data-action="move-res" data-id="${r.id}" data-dir="1" ${i===s.resolutions.length-1?'disabled':''} title="Move down">↓</button>
+          <button class="btn small btn-danger" data-action="delete-res" data-id="${r.id}" title="Delete this resolution">Delete</button>
+        </div>
+      </div>
+      <div class="res-desc-label">Details (read out at the meeting)</div>
+      <textarea data-edit-res="${r.id}" data-field="description" placeholder="Full text of the resolution…">${esc(r.description||'')}</textarea>
+      <div class="res-2_3">
+        <label>
+          <input type="checkbox" data-edit-res="${r.id}" data-field="requires2_3" ${r.requires2_3?'checked':''}>
+          <span>Requires <b>2/3 quorum + 2/3 majority</b></span>
+        </label>
+        ${r.requires2_3 ? `
+        <div class="res-threshold">
+          <span>Compare the majority against</span>
+          <select data-edit-res="${r.id}" data-field="thresholdBase">
+            <option value="present" ${r.thresholdBase==='present'?'selected':''}>owners present at the meeting</option>
+            <option value="cast" ${r.thresholdBase==='cast'?'selected':''}>votes actually cast on this resolution</option>
+            <option value="total" ${r.thresholdBase==='total'?'selected':''}>all owners in the building</option>
+          </select>
+        </div>` : ''}
+      </div>
+    </div>
+  `).join('') || `<p class="muted">No resolutions yet. Click "+ Add resolution" below.</p>`;
+
+  return `
+    ${meta}
+    <div class="card">
+      <h2 style="margin-top:0">Resolutions for this meeting</h2>
+      <p class="muted small">Each resolution will offer three answers: <b>Agree</b>, <b>Disagree</b>, <b>With Majority</b>. "With Majority" votes count toward the leading side.</p>
+      ${rows}
+      <div class="row" style="margin-top:14px">
+        <button class="btn" data-action="add-res">+ Add resolution</button>
+        <div class="spacer grow"></div>
+        <button class="btn btn-primary btn-big" data-action="session-tab" data-tab="checkin" ${s.resolutions.length===0?'disabled':''}>Continue → Check-in</button>
+      </div>
+    </div>
+  `;
+},
+
+checkin(s) {
+  const owners = State.data.owners;
+  const q = Calc.quorumReached(s, owners, State.data.settings);
+  const presentCount = Calc.presentCount(s, owners);
+  const pct = q.T ? Math.round((q.P / q.T) * 100) : 0;
+  const has2_3 = s.resolutions.some(r => r.requires2_3);
+  let banner;
+  if (!has2_3) {
+    banner = `<div class="banner" style="border-color:var(--line-strong); background:#faf6ee; color:var(--muted)">No resolutions in this session require 2/3 quorum — simple majority only. Mark whoever is present and continue.</div>`;
+  } else if (q.reached) {
+    banner = `<div class="banner ok"><b>2/3 quorum reached ✓</b> — ${presentCount} of ${owners.length} owners, fraction <b>${fmt(q.P)}</b> / ${fmt(q.T)} (${pct}%) ≥ threshold ${fmt(Math.ceil(q.threshold))}.</div>`;
+  } else {
+    banner = `<div class="banner bad"><b>2/3 quorum not yet reached</b> — Have ${presentCount} owners, fraction <b>${fmt(q.P)}</b> / ${fmt(q.T)}. Need at least <b>${fmt(Math.ceil(q.threshold))}</b> (${(State.data.settings.quorumFraction*100).toFixed(1)}%). Any 2/3 resolution will be postponed until this is reached.</div>`;
+  }
+
+  const cards = owners.map(o => {
+    const a = s.attendance[o.houseNumber] || {};
+    const isProxied = !a.present && a.proxy && s.attendance[a.proxy] && s.attendance[a.proxy].present;
+    const cardClass = a.present ? 'present' : (isProxied ? 'proxied' : '');
+    const proxyOptions = owners
+      .filter(o2 => o2.houseNumber !== o.houseNumber)
+      .map(o2 => `<option value="${o2.houseNumber}" ${a.proxy==o2.houseNumber?'selected':''}>#${o2.houseNumber} ${esc((o2.displayName||'').slice(0,40))}</option>`)
+      .join('');
+    return `
+      <div class="owner-card ${cardClass}" data-search="${esc(String(o.houseNumber) + ' ' + (o.displayName||'') + ' ' + (o.owner||''))}">
+        <div class="num">#${o.houseNumber}</div>
+        <div class="grow">
+          <div class="name">${esc(o.displayName||o.owner||'—')}</div>
+          <div class="frac">Fraction ${o.fraction}</div>
+          ${!a.present ? `
+            <div style="margin-top:4px">
+              <select data-action="set-proxy" data-id="${o.houseNumber}" style="font-size:13px; min-height:32px; padding: 4px 6px">
+                <option value="">— No proxy —</option>
+                ${proxyOptions}
+              </select>
+              ${isProxied ? `<div class="proxy-via">✓ Voting via house #${a.proxy}</div>` : ''}
+            </div>` : ''}
+        </div>
+        <div class="ctrl">
+          <input type="checkbox" class="switch" data-action="toggle-present" data-id="${o.houseNumber}" ${a.present?'checked':''} title="Present">
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="card" style="position:sticky; top:80px; z-index:5">
+      <div class="quorum-bar ${q.reached?'':'short'}">
+        <div><b>${presentCount}</b> / ${owners.length} owners</div>
+        <div>Fraction <b>${fmt(q.P)}</b> / ${fmt(q.T)}</div>
+        <div class="progress"><div style="width:${pct}%"></div></div>
+        <div>${pct}%</div>
+        <div>${has2_3 ? (q.reached ? `<span class="badge ok">2/3 quorum ✓</span>` : `<span class="badge bad">Need ${fmt(Math.ceil(q.threshold))}</span>`) : `<span class="badge muted">No 2/3 required</span>`}</div>
+      </div>
+    </div>
+    ${banner}
+    <div class="row">
+      <input type="text" id="search-owner" placeholder="Search by house #, owner..." value="${esc(State.checkInSearch || '')}" oninput="State.checkInSearch=this.value; App.filterOwners(this.value)" class="grow">
+      <button class="btn btn-primary" data-action="start-voting">Start voting →</button>
+    </div>
+    <div class="owners-grid" id="owners-grid" style="margin-top:14px">${cards}</div>
+  `;
+},
+
+voteEntry(s) {
+  const owners = State.data.owners;
+  const voters = Calc.votersFor(s, owners).sort((a,b) => a.houseNumber - b.houseNumber);
+  const ballotsDone = voters.filter(o => {
+    const v = s.votes[o.houseNumber];
+    return v && s.resolutions.every(r => v[r.id]);
+  }).length;
+
+  if (State.voteHouse) {
+    return Views.voteForm(s, State.voteHouse, voters);
+  }
+
+  const buttons = voters.map(o => {
+    const v = s.votes[o.houseNumber];
+    const done = v && s.resolutions.every(r => v[r.id]);
+    const heldBy = Calc.voteHeldBy(s, o.houseNumber);
+    const isProxy = heldBy && heldBy !== o.houseNumber;
+    return `<button class="${done?'done':''} ${isProxy?'proxy':''}" data-action="pick-ballot" data-id="${o.houseNumber}">${o.houseNumber}${isProxy?` <span class="small">(via #${heldBy})</span>`:''}${done?' ✓':''}</button>`;
+  }).join('');
+
+  return `
+    <div class="card">
+      <div class="row">
+        <h2 style="margin:0">Enter ballots</h2>
+        <span class="pill">${ballotsDone} / ${voters.length} done</span>
+        <div class="spacer grow"></div>
+        <button class="btn" data-action="session-tab" data-tab="results">View results →</button>
+      </div>
+      <p class="muted">Pick a house number to enter or edit that ballot. Houses with ✓ already have all resolutions filled. <b>Proxied</b> ballots (blue) are cast by another house.</p>
+      <div class="ballot-picker">${buttons}</div>
+    </div>
+  `;
+},
+
+voteForm(s, houseNumber, voters) {
+  const owner = Calc.ownerByHouse(State.data.owners, houseNumber);
+  if (!owner) return `<p>Unknown house.</p>`;
+  const v = s.votes[houseNumber] || {};
+  const heldBy = Calc.voteHeldBy(s, houseNumber);
+  const proxyNote = heldBy && heldBy !== houseNumber
+    ? `<div class="banner warn">This ballot is cast by proxy holder house #${heldBy}.</div>` : '';
+
+  const blocks = s.resolutions.map((r, i) => {
+    const cur = v[r.id] || '';
+    return `
+      <div class="resolution-block">
+        <div><b>${esc(r.title)}</b> ${r.requires2_3?'<span class="badge warn">2/3</span>':''}</div>
+        <div class="small muted">${esc((r.description||'').slice(0,260))}${(r.description||'').length>260?'…':''}</div>
+        <div class="vote-buttons" style="margin-top:10px">
+          <button class="agree ${cur==='agree'?'sel':''}" data-action="cast-vote" data-id="${houseNumber}" data-res="${r.id}" data-val="agree">Agree</button>
+          <button class="disagree ${cur==='disagree'?'sel':''}" data-action="cast-vote" data-id="${houseNumber}" data-res="${r.id}" data-val="disagree">Disagree</button>
+          <button class="majority ${cur==='majority'?'sel':''}" data-action="cast-vote" data-id="${houseNumber}" data-res="${r.id}" data-val="majority">With Majority</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="card">
+      <div class="row" style="flex-wrap:nowrap; align-items:center; gap:12px">
+        <button class="btn" data-action="back-to-picker" style="flex-shrink:0">← Back to list</button>
+        <div style="min-width:0; flex:1">
+          <h2 style="margin:0">Ballot — House #${houseNumber}</h2>
+          <div class="muted small">${esc(owner.displayName)} · fraction ${owner.fraction}</div>
+        </div>
+        <button class="btn" data-action="clear-ballot" data-id="${houseNumber}" style="flex-shrink:0">Clear ballot</button>
+      </div>
+      ${proxyNote}
+      ${blocks}
+      <div class="row" style="margin-top:14px">
+        <button class="btn btn-primary btn-big" data-action="back-to-picker">Done — back to list</button>
+      </div>
+    </div>
+  `;
+},
+
+results(s) {
+  const owners = State.data.owners;
+  const q = Calc.quorumReached(s, owners, State.data.settings);
+  const has2_3 = s.resolutions.some(r => r.requires2_3);
+  if (s.resolutions.length === 0) return `<p class="muted">No resolutions to score yet.</p>`;
+  const blocks = s.resolutions.map((r, i) => {
+    const out = Calc.resolutionVerdict(s, owners, State.data.settings, r);
+    const { tally, verdict, reason, winnerSide, winningTotal } = out;
+    const total = Math.max(q.T, tally.cast);
+    const seg = (val, cls, label) => val > 0 ? `<div class="seg ${cls}" style="width:${(val/total)*100}%" title="${label}">${fmt(val)}</div>` : '';
+    const absent = Math.max(0, q.T - tally.cast);
+    return `
+      <div class="result-card ${verdict.toLowerCase()}">
+        <div class="row">
+          <h3 style="margin:0">${esc(r.title)}</h3>
+          ${r.requires2_3?'<span class="badge warn">2/3 required</span>':''}
+          <div class="spacer grow"></div>
+          <span class="verdict">${verdict}</span>
+        </div>
+        <p class="muted small">${esc(reason)}</p>
+        <div class="stacked-bar" style="margin-top:8px">
+          ${seg(tally.A, 'agree', 'Agree')}
+          ${seg(tally.M, 'majority', 'With Majority')}
+          ${seg(tally.D, 'disagree', 'Disagree')}
+          ${seg(absent, 'absent', 'Absent / not voted')}
+        </div>
+        <div class="kv small" style="margin-top:10px">
+          <b>Agree</b><span>${fmt(tally.A)}</span>
+          <b>Disagree</b><span>${fmt(tally.D)}</span>
+          <b>With Majority</b><span>${fmt(tally.M)}</span>
+          <b>Participation</b><span>${fmt(tally.cast)} of ${fmt(q.T)}</span>
+          <b>Winning side</b><span>${winnerSide} (total ${fmt(winningTotal)})</span>
+          ${r.requires2_3?`<b>2/3 threshold</b><span>${((r.thresholdBase==='cast'?tally.cast:r.thresholdBase==='total'?q.T:q.P) * 2/3).toFixed(2)} (of ${r.thresholdBase||'present'})</span>`:''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="card">
+      <div class="row">
+        <h2 style="margin:0">Results</h2>
+        ${has2_3 ? `<span class="badge ${q.reached?'ok':'bad'}">${q.reached?'2/3 quorum reached':'2/3 quorum NOT reached'}</span>` : `<span class="badge muted">No 2/3 required</span>`}
+        <div class="spacer grow"></div>
+        <button class="btn" data-action="export-csv">Save votes as spreadsheet (CSV)</button>
+        ${s.status !== 'closed' ? `<button class="btn btn-ok" data-action="close-session">Close session</button>` : `<span class="badge ok">CLOSED</span>`}
+      </div>
+      <p class="muted small">Present fraction: <b>${fmt(q.P)}</b> of ${fmt(q.T)} (${q.T?Math.round(q.P/q.T*100):0}%).${has2_3 ? ` 2/3 threshold: ${fmt(Math.ceil(q.threshold))}.` : ''}</p>
+    </div>
+    ${blocks}
+  `;
+},
+
+audit(s) {
+  const rows = (s.auditLog || []).slice().reverse().map(e => `
+    <div class="audit-row">
+      <span class="muted small">${esc(new Date(e.ts).toLocaleString())}</span>
+      <code>${esc(e.action)}</code>
+      <span>${esc(JSON.stringify(e.payload))}</span>
+    </div>
+  `).join('') || `<p class="muted">No events yet.</p>`;
+  return `
+    <div class="card">
+      <div class="row">
+        <h2 style="margin:0">Audit log</h2>
+        <span class="muted small">${(s.auditLog||[]).length} events</span>
+        <div class="spacer grow"></div>
+        <button class="btn" data-action="export-audit-csv">Save log as spreadsheet (CSV)</button>
+      </div>
+      ${rows}
+    </div>
+  `;
+},
+
+importExport() {
+  return `
+    <h1>Save / Load all data</h1>
+    <div class="card">
+      <h3 style="margin-top:0">Save everything to a file</h3>
+      <p>Saves all owners, all sessions, and settings as one file. Keep it somewhere safe (USB stick, Dropbox, email to yourself).</p>
+      <button class="btn btn-primary btn-big" data-action="download-backup">Save everything to a file</button>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Load everything from a file</h3>
+      <p>Replaces all current data with what's in the chosen file. <b>You will lose anything not in the file.</b></p>
+      <div class="row" style="margin-top:10px">
+        <label class="btn btn-big" for="restore-file">Choose a file…</label>
+        <input type="file" id="restore-file" accept="application/json" style="display:none" onchange="document.getElementById('restore-file-name').textContent = this.files[0] ? this.files[0].name : 'No file chosen'; document.getElementById('restore-file-msg').textContent = '';">
+        <span id="restore-file-name" class="muted">No file chosen</span>
+      </div>
+      <div style="margin-top:14px">
+        <button class="btn btn-danger btn-big" data-action="restore-backup">Load from the selected file</button>
+        <div id="restore-file-msg" class="small" style="color: var(--bad); margin-top: 8px; min-height: 20px;"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Reset everything</h3>
+      <p>Deletes all sessions and resets owners to the original list. Save a backup first if you might need this data later.</p>
+      <button class="btn btn-danger" data-action="factory-reset">Reset everything</button>
+    </div>
+    <button class="btn btn-link" data-action="goto-home">← Back</button>
+  `;
+}
+
+};  // End Views
+
+/* ---------- APP ---------- */
+const App = {
+  init() {
+    State.init();
+    document.body.addEventListener('click', App.onClick);
+    document.body.addEventListener('change', App.onChange);
+    document.body.addEventListener('input', App.onInput);
+    document.body.addEventListener('focusin', App.onFocusIn);
+    App.render();
+  },
+  render() {
+    const app = document.getElementById('app');
+    let html = '';
+    switch (State.view) {
+      case 'home': html = Views.home(); break;
+      case 'owners': html = Views.owners(); break;
+      case 'new': html = Views.newSession(); break;
+      case 'session': html = Views.session(); break;
+      case 'importexport': html = Views.importExport(); break;
+    }
+    app.innerHTML = html;
+    App.updateCrumb();
+    Saved.render();
+    // Re-apply check-in search filter after each render so toggles don't reset it
+    if (State.view === 'session' && State.sessionView === 'checkin' && State.checkInSearch) {
+      App.filterOwners(State.checkInSearch);
+    }
+  },
+  updateCrumb() {
+    const c = document.getElementById('crumb');
+    const hb = document.getElementById('home-btn');
+    let p = '';
+    if (State.view === 'home') p = 'Meetings';
+    else if (State.view === 'owners') p = 'Owners';
+    else if (State.view === 'new') p = 'New session';
+    else if (State.view === 'session') {
+      const s = Actions.getSession(State.params.id);
+      p = s ? `${s.title} — ${State.sessionView}` : 'Session';
+    } else if (State.view === 'importexport') p = 'Save / Load all data';
+    c.textContent = p;
+    if (hb) hb.style.display = State.view === 'home' ? 'none' : '';
+  },
+  go(view, params = {}) { State.view = view; State.params = params; State.voteHouse = null; State.checkInSearch = ''; App.render(); window.scrollTo(0,0); },
+  goSession(id, tab='setup') { State.view = 'session'; State.params = { id }; State.sessionView = tab; State.voteHouse = null; State.checkInSearch = ''; App.render(); window.scrollTo(0,0); },
+
+  onClick(ev) {
+    // Close any open kebab menu if the click was outside one
+    if (!ev.target.closest('details.kebab')) {
+      document.querySelectorAll('details.kebab[open]').forEach(d => d.removeAttribute('open'));
+    }
+    const t = ev.target.closest('[data-action]');
+    if (!t) return;
+    const a = t.dataset.action;
+    const id = t.dataset.id;
+    // If the click was on a kebab menu item, close the menu
+    if (ev.target.closest('.kebab-menu')) {
+      const k = ev.target.closest('details.kebab');
+      if (k) k.removeAttribute('open');
+    }
+    // Guard: closed sessions are read-only except for nav, exports, audit, and reopen
+    if (State.view === 'session') {
+      const s = Actions.getSession(State.params.id);
+      if (s && s.status === 'closed') {
+        const allowed = new Set(['goto-home','goto-owners','goto-importexport','session-tab','reopen-session','export-csv','export-audit-csv','back-to-picker','pick-ballot']);
+        if (!allowed.has(a)) { toast('Session is closed — reopen to edit', 'warn'); return; }
+      }
+    }
+    const fns = {
+      'goto-home': () => App.go('home'),
+      'goto-owners': () => App.go('owners'),
+      'goto-new': () => App.go('new'),
+      'goto-importexport': () => App.go('importexport'),
+      'open-session': () => App.goSession(id, Actions.getSession(id)?.status === 'closed' ? 'results' : (Actions.getSession(id)?.status === 'voting' ? 'vote' : Actions.getSession(id)?.status === 'checkin' ? 'checkin' : 'setup')),
+      'view-audit': () => App.goSession(id, 'audit'),
+      'delete-session': () => { if (confirmModal('Delete this session permanently?')) { Actions.deleteSession(id); App.render(); toast('Session deleted'); } },
+      'session-tab': () => { State.sessionView = t.dataset.tab; State.voteHouse = null; App.render(); window.scrollTo(0,0); },
+      'create-session': () => {
+        const title = document.getElementById('new-title').value.trim() || 'VVE Meeting';
+        const date = document.getElementById('new-date').value;
+        const s = Actions.newSession(title, date);
+        App.goSession(s.id, 'setup');
+      },
+      'add-owner': () => {
+        const nextHouse = Math.max(...State.data.owners.map(o=>+o.houseNumber).filter(n=>n<99999), 400) + 1;
+        State.data.owners.push({ houseNumber: nextHouse, buildingNumber: null, fraction: 0, owner: '', displayName: 'New owner' });
+        State.persist(); App.render();
+      },
+      'delete-owner': () => {
+        if (!confirmModal(`Delete owner #${id}? Total fraction will change.`)) return;
+        State.data.owners = State.data.owners.filter(o => String(o.houseNumber) !== String(id));
+        State.persist(); App.render();
+      },
+      'add-res': () => {
+        const s = Actions.getSession(State.params.id);
+        Actions.updateSession(s, ss => {
+          ss.resolutions.push({ id: uid(), title: 'New resolution', description: '', requires2_3: false, thresholdBase: 'present' });
+          Audit.log(ss, 'resolution.add', { count: ss.resolutions.length });
+        });
+        App.render();
+      },
+      'delete-res': () => {
+        if (!confirmModal('Delete this resolution?')) return;
+        const s = Actions.getSession(State.params.id);
+        Actions.updateSession(s, ss => {
+          ss.resolutions = ss.resolutions.filter(r => r.id !== id);
+          for (const h of Object.keys(ss.votes||{})) { if (ss.votes[h]) delete ss.votes[h][id]; }
+          Audit.log(ss, 'resolution.delete', { id });
+        });
+        App.render();
+      },
+      'move-res': () => {
+        const dir = parseInt(t.dataset.dir, 10);
+        const s = Actions.getSession(State.params.id);
+        Actions.updateSession(s, ss => {
+          const i = ss.resolutions.findIndex(r => r.id === id);
+          const j = i + dir;
+          if (i >= 0 && j >= 0 && j < ss.resolutions.length) {
+            const [r] = ss.resolutions.splice(i, 1);
+            ss.resolutions.splice(j, 0, r);
+            Audit.log(ss, 'resolution.move', { id, from: i, to: j });
+          }
+        });
+        App.render();
+      },
+      'toggle-present': () => {}, // handled in onChange
+      'set-proxy': () => {},
+      'start-voting': () => {
+        const s = Actions.getSession(State.params.id);
+        const q = Calc.quorumReached(s, State.data.owners, State.data.settings);
+        if (!q.reached) {
+          const has2_3 = s.resolutions.some(r => r.requires2_3);
+          const msg = has2_3
+            ? `Quorum (2/3 presence) is NOT reached: ${fmt(q.P)} of ${fmt(q.T)}.\n\nAny resolutions requiring 2/3 majority will be marked POSTPONED. Simple-majority resolutions can still be decided.\n\nYou can always come back to update attendance. Start voting?`
+            : `Quorum (2/3 presence) is NOT reached: ${fmt(q.P)} of ${fmt(q.T)}.\n\nNo resolutions require 2/3, so this is fine. Start voting?`;
+          if (!confirmModal(msg)) return;
+        }
+        Actions.updateSession(s, ss => { ss.status = 'voting'; Audit.log(ss, 'voting.start', { presentFraction: q.P, quorumReached: q.reached }); });
+        State.sessionView = 'vote';
+        App.render();
+        toast('Voting started');
+      },
+      'pick-ballot': () => { State.voteHouse = +id; App.render(); window.scrollTo(0,0); },
+      'back-to-picker': () => { State.voteHouse = null; App.render(); },
+      'cast-vote': () => {
+        const res = t.dataset.res, val = t.dataset.val, house = +t.dataset.id;
+        const s = Actions.getSession(State.params.id);
+        Actions.updateSession(s, ss => {
+          if (!ss.votes[house]) ss.votes[house] = {};
+          const old = ss.votes[house][res];
+          ss.votes[house][res] = val;
+          Audit.log(ss, 'vote.set', { house, res, old: old || null, val });
+        });
+        App.render();
+      },
+      'clear-ballot': () => {
+        if (!confirmModal(`Clear all votes for house #${id}?`)) return;
+        const s = Actions.getSession(State.params.id);
+        Actions.updateSession(s, ss => {
+          const old = ss.votes[id];
+          delete ss.votes[id];
+          Audit.log(ss, 'vote.clear', { house: +id, prior: old });
+        });
+        App.render();
+      },
+      'close-session': () => {
+        if (!confirmModal('Close this session? It becomes read-only. You can reopen any time to make corrections.')) return;
+        const s = Actions.getSession(State.params.id);
+        Actions.updateSession(s, ss => { ss.priorStatus = ss.status; ss.status = 'closed'; ss.closedAt = new Date().toISOString(); Audit.log(ss, 'session.close', {}); });
+        App.render();
+        toast('Session closed (read-only)');
+      },
+      'reopen-session': () => {
+        const s = Actions.getSession(State.params.id);
+        if (!confirmModal('Reopen this session for editing? This will be recorded in the audit log.')) return;
+        Actions.updateSession(s, ss => { ss.status = ss.priorStatus || 'voting'; ss.closedAt = null; Audit.log(ss, 'session.reopen', {}); });
+        App.render();
+        toast('Session reopened');
+      },
+      'export-csv': () => App.exportCSV(),
+      'export-session-by-id': () => {
+        const s = Actions.getSession(id);
+        if (!s) return;
+        App.download(`${s.date}-${s.title.replace(/\W+/g,'-')}-session.json`, JSON.stringify(s, null, 2));
+      },
+      'export-audit-csv': () => App.exportAuditCSV(),
+      'download-backup': () => App.downloadBackup(),
+      'restore-backup': () => App.restoreBackup(),
+      'factory-reset': () => {
+        if (!confirmModal('Delete ALL sessions and reset owners to the original list? This cannot be undone.')) return;
+        Storage.reset();
+        State.init();
+        App.go('home');
+        toast('Everything has been reset');
+      }
+    };
+    if (fns[a]) fns[a]();
+  },
+
+  onChange(ev) {
+    const t = ev.target;
+    // Duplicate-house-number guard (fires on blur for the Owners table input)
+    if (t.dataset.editOwner && t.dataset.field === 'houseNumber') {
+      const initial = t.dataset.initialValue;
+      const newNum = t.value === '' ? '' : Number(t.value);
+      if (newNum !== '' && String(newNum) !== String(initial)) {
+        const dup = State.data.owners.filter(o => String(o.houseNumber) === String(newNum));
+        if (dup.length > 1) {
+          alert(`House #${newNum} is already used by another owner. Reverting to ${initial}.`);
+          const owner = State.data.owners.find(o => String(o.houseNumber) === String(newNum) && o !== dup[0]);
+          if (owner) owner.houseNumber = initial === '' ? null : Number(initial);
+          t.value = initial;
+          State.persist();
+          App.render();
+          return;
+        }
+      }
+    }
+    // Single audit log entry on commit for session/resolution edits
+    if ((t.dataset.editSession || t.dataset.editRes) && State.view === 'session') {
+      const s = Actions.getSession(State.params.id);
+      if (s && s.status !== 'closed') {
+        const initial = t.dataset.initialValue;
+        const cur = t.type === 'checkbox' ? String(t.checked) : t.value;
+        if (initial !== undefined && initial !== cur) {
+          if (t.dataset.editSession) {
+            Audit.log(s, 'session.edit', { field: t.dataset.editSession, old: initial, val: cur });
+          } else {
+            Audit.log(s, 'resolution.edit', { id: t.dataset.editRes, field: t.dataset.field, old: initial, val: cur });
+          }
+          State.persist();
+        }
+      }
+      delete t.dataset.initialValue;
+    }
+    // Guard: closed sessions are read-only for attendance/proxy changes
+    if ((t.dataset.action === 'toggle-present' || t.dataset.action === 'set-proxy') && State.view === 'session') {
+      const s = Actions.getSession(State.params.id);
+      if (s && s.status === 'closed') { App.render(); return; }
+    }
+    if (t.dataset.action === 'import-owners-file') {
+      const f = t.files[0]; if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const incoming = JSON.parse(reader.result);
+          let owners;
+          let isFullBackup = false;
+          if (Array.isArray(incoming)) {
+            owners = incoming;
+          } else if (incoming && Array.isArray(incoming.owners)) {
+            owners = incoming.owners;
+            isFullBackup = !!(Array.isArray(incoming.sessions) && incoming.sessions.length);
+          } else {
+            throw new Error("This file doesn't contain an owners list.");
+          }
+          if (!owners.length || owners[0].houseNumber === undefined || owners[0].fraction === undefined) {
+            throw new Error("Owners file looks empty or malformed.");
+          }
+          // If we're replacing existing owners + sessions, confirm
+          if (State.data.owners.length || State.data.sessions.length) {
+            const msg = isFullBackup
+              ? 'This file is a full backup. It will replace ALL current data (owners and every session). Continue?'
+              : `Replace the current ${State.data.owners.length} owners with ${owners.length} from this file? (Existing sessions are kept.)`;
+            if (!confirmModal(msg)) { t.value = ''; return; }
+          }
+          if (isFullBackup) {
+            State.data = incoming;
+            if (!State.data.settings) State.data.settings = { quorumFraction: 2/3, twoThirdsBase: 'present' };
+          } else {
+            State.data.owners = owners;
+          }
+          State.persist();
+          App.render();
+          toast(`Loaded ${owners.length} owners` + (isFullBackup ? ` and ${incoming.sessions.length} sessions` : ''));
+        } catch (e) {
+          toast('Could not load file: ' + e.message, 'bad');
+        }
+        t.value = '';
+      };
+      reader.readAsText(f);
+      return;
+    }
+    if (t.dataset.action === 'import-session-file') {
+      const f = t.files[0]; if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const incoming = JSON.parse(reader.result);
+          if (!incoming || !incoming.resolutions) throw new Error("This doesn't look like a session file.");
+          const existingIdx = State.data.sessions.findIndex(s => s.id === incoming.id);
+          if (existingIdx >= 0) {
+            if (!confirmModal(`A session called "${State.data.sessions[existingIdx].title}" is already on this device. Replace it with the one in this file?`)) return;
+            State.data.sessions[existingIdx] = incoming;
+          } else {
+            State.data.sessions.unshift(incoming);
+          }
+          State.persist();
+          App.render();
+          toast(`Session "${incoming.title}" opened (${incoming.resolutions.length} resolutions)`);
+        } catch (e) { toast('Could not open file: ' + e.message, 'bad'); }
+        t.value = '';
+      };
+      reader.readAsText(f);
+      return;
+    }
+    if (t.dataset.action === 'toggle-present') {
+      const house = +t.dataset.id;
+      const s = Actions.getSession(State.params.id);
+      Actions.updateSession(s, ss => {
+        if (!ss.attendance[house]) ss.attendance[house] = { present: false, proxy: null };
+        ss.attendance[house].present = t.checked;
+        if (t.checked) ss.attendance[house].proxy = null;
+        Audit.log(ss, 'attendance.toggle', { house, present: t.checked });
+      });
+      App.render();
+    } else if (t.dataset.action === 'set-proxy') {
+      const house = +t.dataset.id;
+      const proxy = t.value ? +t.value : null;
+      const s = Actions.getSession(State.params.id);
+      Actions.updateSession(s, ss => {
+        if (!ss.attendance[house]) ss.attendance[house] = { present: false, proxy: null };
+        ss.attendance[house].proxy = proxy;
+        Audit.log(ss, 'attendance.proxy', { house, proxy });
+      });
+      App.render();
+    }
+  },
+
+  onInput(ev) {
+    const t = ev.target;
+    // Live data updates only — audit log entries are written on commit (in onChange).
+    if ((t.dataset.editRes || t.dataset.editSession) && State.view === 'session') {
+      const s = Actions.getSession(State.params.id);
+      if (s && s.status === 'closed') return;
+    }
+    if (t.dataset.editSession) {
+      const field = t.dataset.editSession;
+      const s = Actions.getSession(State.params.id);
+      if (!s) return;
+      s[field] = t.value;
+      s.updatedAt = new Date().toISOString();
+      State.persist();
+      const h1 = document.querySelector('.app h1');
+      if (h1) h1.innerHTML = `${esc(s.title)} <span class="muted small">— ${esc(s.date)}</span>`;
+      App.updateCrumb();
+      return;
+    }
+    if (t.dataset.editOwner) {
+      const house = t.dataset.editOwner;
+      const field = t.dataset.field;
+      const o = State.data.owners.find(o => String(o.houseNumber) === String(house));
+      if (!o) return;
+      let val = t.value;
+      if (field === 'houseNumber' || field === 'buildingNumber' || field === 'fraction') {
+        val = val === '' ? null : Number(val);
+      }
+      o[field] = val;
+      State.persist();
+    } else if (t.dataset.editRes) {
+      const resId = t.dataset.editRes;
+      const field = t.dataset.field;
+      const s = Actions.getSession(State.params.id);
+      if (!s) return;
+      const r = s.resolutions.find(r => r.id === resId);
+      if (!r) return;
+      let val = t.type === 'checkbox' ? t.checked : t.value;
+      r[field] = val;
+      s.updatedAt = new Date().toISOString();
+      State.persist();
+      if (field === 'requires2_3') App.render(); // re-render to show/hide threshold select
+    }
+  },
+
+  onFocusIn(ev) {
+    const t = ev.target;
+    if (t.dataset.editSession || t.dataset.editRes || (t.dataset.editOwner && t.dataset.field === 'houseNumber')) {
+      t.dataset.initialValue = t.type === 'checkbox' ? String(t.checked) : (t.value ?? '');
+    }
+  },
+
+  filterOwners(q) {
+    q = (q || '').toLowerCase().trim();
+    const grid = document.getElementById('owners-grid');
+    if (!grid) return;
+    [...grid.children].forEach(card => {
+      const txt = (card.dataset.search || '').toLowerCase();
+      card.style.display = (!q || txt.includes(q)) ? '' : 'none';
+    });
+  },
+
+  download(name, content, type='application/json') {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  },
+
+  exportCSV() {
+    const s = Actions.getSession(State.params.id);
+    const owners = State.data.owners;
+    const rows = [['House','Fraction','Resolution','Vote']];
+    for (const o of owners) {
+      const v = s.votes[o.houseNumber];
+      for (const r of s.resolutions) {
+        rows.push([o.houseNumber, o.fraction, r.title, (v && v[r.id]) || '']);
+      }
+    }
+    const csv = rows.map(r => r.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+    App.download(`${s.date}-${s.title.replace(/\W+/g,'-')}-votes.csv`, csv, 'text/csv');
+  },
+  exportAuditCSV() {
+    const s = Actions.getSession(State.params.id);
+    const rows = [['Timestamp','Action','Payload']];
+    for (const e of (s.auditLog||[])) rows.push([e.ts, e.action, JSON.stringify(e.payload)]);
+    const csv = rows.map(r => r.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+    App.download(`${s.date}-audit.csv`, csv, 'text/csv');
+  },
+  downloadBackup() {
+    // Stamp uses local time so the filename matches what the operator sees on the wall clock.
+    App.download(`vve-backup-${localStamp()}.json`, JSON.stringify(State.data, null, 2));
+  },
+  restoreBackup() {
+    const msg = document.getElementById('restore-file-msg');
+    const setMsg = (text) => { if (msg) msg.textContent = text; };
+    const f = document.getElementById('restore-file').files[0];
+    if (!f) { setMsg('Choose a file first using the button above.'); return; }
+    setMsg('');
+    if (!confirmModal('This will replace ALL current data (owners and every session) with what is in the file. Continue?')) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const d = JSON.parse(reader.result);
+        if (!d.owners || !d.sessions) throw new Error("This doesn't look like an all-data file.");
+        State.data = d;
+        if (!State.data.settings) State.data.settings = { quorumFraction: 2/3, twoThirdsBase: 'present' };
+        State.persist();
+        App.go('home');
+        toast('Loaded successfully');
+      } catch (e) { setMsg('Could not load file: ' + e.message); }
+    };
+    reader.readAsText(f);
+  }
+};
+
+App.init();
+</script>
+</body>
+</html>
