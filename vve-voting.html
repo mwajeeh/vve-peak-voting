@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -382,6 +382,12 @@ const fmt = n => Number(n).toLocaleString('en-US');
 const pad2 = n => String(n).padStart(2, '0');
 const localDate = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
 const localStamp = (d = new Date()) => `${localDate(d)}-${pad2(d.getHours())}-${pad2(d.getMinutes())}-${pad2(d.getSeconds())}`;
+const formatDateLong = (isoDate) => {
+  if (!isoDate) return '';
+  const d = new Date(isoDate + 'T00:00:00');
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+};
 const esc = s => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -589,7 +595,7 @@ home() {
     return `
       <div class="card row">
         <div class="grow">
-          <div><b>${esc(s.title)}</b> &nbsp; <span class="muted small">${esc(s.date)}</span></div>
+          <div><b>${esc(s.title)}</b> &nbsp; <span class="muted small">${esc(formatDateLong(s.date) || s.date)}</span></div>
           <div class="small muted">${s.resolutions.length} resolution${s.resolutions.length===1?'':'s'} • ${badge}</div>
         </div>
         <button class="btn btn-primary" data-action="open-session" data-id="${s.id}">Open</button>
@@ -658,7 +664,8 @@ newSession() {
       <label>Meeting title</label>
       <input type="text" id="new-title" placeholder="VVE meeting at PEAK NOORDERPLASSEN" value="VVE meeting at PEAK NOORDERPLASSEN">
       <label>Date</label>
-      <input type="date" id="new-date" value="${today}">
+      <input type="date" id="new-date" value="${today}" oninput="document.getElementById('new-date-pretty').textContent = (function(v){const d=new Date(v+'T00:00:00');return isNaN(d.getTime())?'':d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'long',year:'numeric'})})(this.value)">
+      <div class="small muted" id="new-date-pretty" style="margin-top:4px">${esc(formatDateLong(today))}</div>
       <div class="row" style="margin-top:16px">
         <button class="btn btn-primary btn-big" data-action="create-session">Create session →</button>
         <button class="btn btn-link" data-action="goto-home">Cancel</button>
@@ -699,7 +706,7 @@ session() {
       </div>
     </div>` : '';
   return `
-    <h1>${esc(s.title)} <span class="muted small">— ${esc(s.date)}</span></h1>
+    <h1>${esc(s.title)} <span class="muted small">— ${esc(formatDateLong(s.date) || s.date)}</span></h1>
     ${Views.stepBar(State.sessionView)}
     ${closedBanner}
     <div class="${s.status==='closed' ? 'session-locked' : ''}">${body}</div>
@@ -710,14 +717,15 @@ setupSession(s) {
   const meta = `
     <div class="card">
       <h2 style="margin-top:0">Meeting details</h2>
-      <div class="row" style="align-items:flex-end">
+      <div class="row" style="align-items:flex-start">
         <div class="grow">
-          <label>Meeting title</label>
+          <label style="margin-top:0">Meeting title</label>
           <input type="text" data-edit-session="title" value="${esc(s.title)}">
         </div>
         <div style="min-width:200px">
-          <label>Date</label>
+          <label style="margin-top:0">Date</label>
           <input type="date" data-edit-session="date" value="${esc(s.date)}">
+          <div class="small muted" id="session-date-pretty" style="margin-top:4px">${esc(formatDateLong(s.date))}</div>
         </div>
       </div>
     </div>
@@ -1356,7 +1364,9 @@ const App = {
       s.updatedAt = new Date().toISOString();
       State.persist();
       const h1 = document.querySelector('.app h1');
-      if (h1) h1.innerHTML = `${esc(s.title)} <span class="muted small">— ${esc(s.date)}</span>`;
+      if (h1) h1.innerHTML = `${esc(s.title)} <span class="muted small">— ${esc(formatDateLong(s.date) || s.date)}</span>`;
+      const pretty = document.getElementById('session-date-pretty');
+      if (pretty && field === 'date') pretty.textContent = formatDateLong(t.value);
       App.updateCrumb();
       return;
     }
