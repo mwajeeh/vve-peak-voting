@@ -1093,7 +1093,7 @@ const App = {
       'goto-owners': () => App.go('owners'),
       'goto-new': () => App.go('new'),
       'goto-importexport': () => App.go('importexport'),
-      'open-session': () => App.goSession(id, Actions.getSession(id)?.status === 'closed' ? 'results' : (Actions.getSession(id)?.status === 'voting' ? 'vote' : Actions.getSession(id)?.status === 'checkin' ? 'checkin' : 'setup')),
+      'open-session': () => App.goSession(id, 'setup'),
       'view-audit': () => App.goSession(id, 'audit'),
       'delete-session': () => { if (confirmModal('Delete this session permanently?')) { Actions.deleteSession(id); App.render(); toast('Session deleted'); } },
       'session-tab': () => { State.sessionView = t.dataset.tab; State.voteHouse = null; App.render(); window.scrollTo(0,0); },
