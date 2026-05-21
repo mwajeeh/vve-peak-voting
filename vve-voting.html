@@ -59,6 +59,21 @@
   header.topbar .crumb { color: var(--muted); }
   header.topbar .spacer { flex: 1; }
   header.topbar .savedhint { font-size: 14px; color: var(--ok); }
+  header.topbar .lang-switch {
+    display: inline-flex; gap: 0; border: 1px solid var(--line-strong);
+    border-radius: 6px; overflow: hidden; background: var(--surface);
+  }
+  header.topbar .lang-switch button {
+    border: none; padding: 6px 12px; min-height: 0; min-width: 0;
+    font-size: 13px; font-weight: 700; letter-spacing: .05em;
+    background: var(--surface); color: var(--muted); cursor: pointer;
+    border-radius: 0;
+  }
+  header.topbar .lang-switch button:hover { background: #f6f1e8; color: var(--ink); }
+  header.topbar .lang-switch button.active {
+    background: var(--primary); color: var(--primary-ink);
+  }
+  header.topbar .lang-switch button.active:hover { background: var(--primary); }
   h1 { font-size: 28px; margin: 24px 0 8px; }
   h2 { font-size: 22px; margin: 20px 0 8px; }
   h3 { font-size: 18px; margin: 16px 0 6px; }
@@ -307,11 +322,15 @@
 </head>
 <body>
 <header class="topbar">
-  <div class="logo" data-action="goto-home" title="Go to Home">Peak <span class="accent">VVE</span> Voting</div>
-  <button class="home-btn" id="home-btn" data-action="goto-home" style="display:none">← Home</button>
+  <div class="logo" id="logo" data-action="goto-home">Peak <span class="accent">VVE</span> Voting</div>
+  <button class="home-btn" id="home-btn" data-action="goto-home" style="display:none"></button>
   <div class="crumb small" id="crumb"></div>
   <div class="spacer"></div>
   <div class="savedhint" id="savedhint"></div>
+  <div class="lang-switch" id="lang-switch" title="">
+    <button data-action="set-lang" data-lang="nl">NL</button>
+    <button data-action="set-lang" data-lang="en">EN</button>
+  </div>
 </header>
 
 <div class="app" id="app"></div>
@@ -322,6 +341,464 @@
 // Intentionally empty so this file can be safely hosted on a public site.
 // Owners are loaded from a file the board distributes separately.
 const SEED_OWNERS = [];
+
+/* ---------- I18N ---------- */
+// All user-facing strings live here. Calc, vote codes, audit actions and
+// stored data are never translated — only the rendering layer.
+const LANG_KEY = "vve.lang";
+
+const i18n = {
+  nl: {
+    // common
+    'btn.back': '← Terug',
+    'btn.cancel': 'Annuleren',
+    'btn.home': '← Startscherm',
+    'btn.no_file_chosen': 'Geen bestand gekozen',
+    'tab.setup': 'voorbereiden',
+    'tab.checkin': 'aanmelden',
+    'tab.vote': 'stemmen invoeren',
+    'tab.results': 'uitslag',
+    'tab.audit': 'logboek',
+    // saved indicator
+    'saved.now': '✓ Opgeslagen',
+    'saved.ago': s => `✓ Opgeslagen ${s} sec geleden`,
+    // logo / lang switch
+    'logo.title': 'Ga naar startscherm',
+    'lang.switch_title': 'Taal wisselen',
+    // welcome
+    'welcome.h1': 'Welkom',
+    'welcome.h2': 'Eerste stap: laad de eigenarenlijst',
+    'welcome.p1': 'Voordat u een vergadering kunt starten heeft deze tool de VvE-eigenarendata nodig (huisnummers, namen en stemfracties). Het bestuur deelt dit als een bestand.',
+    'welcome.p2': 'Kies het bestand dat u heeft ontvangen om te beginnen.',
+    'welcome.choose_owners': 'Kies eigenarenbestand…',
+    'welcome.or_full_backup': 'Of laad een volledige back-up',
+    'welcome.no_file': 'Heeft u geen bestand? Vraag het bestuur om het VvE-eigenarenbestand.',
+    // home
+    'home.h1': 'Vergaderingen',
+    'home.total_summary': (n, frac) => `${n} eigenaren · totale stemfractie <b>${frac}</b>.`,
+    'home.new_session': '+ Nieuwe stemsessie',
+    'home.manage_owners': 'Eigenaren beheren',
+    'home.save_load_all': 'Alles opslaan / inladen',
+    'home.past_current': 'Eerdere en huidige sessies',
+    'home.open_session_from_file': 'Sessie openen uit bestand…',
+    'home.open_from_file_title': 'Voeg een sessie toe die iemand met u heeft gedeeld',
+    'home.no_sessions': 'Nog geen sessies.',
+    'home.session.open': 'Openen',
+    'home.session.more_actions': 'Meer acties',
+    'home.kebab.view_audit': 'Logboek bekijken',
+    'home.kebab.save_to_file': 'Opslaan als bestand',
+    'home.kebab.delete': 'Verwijderen',
+    'home.badge.setup': 'Voorbereiden',
+    'home.badge.checkin': 'Aanmelden',
+    'home.badge.voting': 'Stemmen',
+    'home.badge.approved': (n, t) => `${n}/${t} aangenomen`,
+    'home.resolutions_count': n => `${n} ${n===1?'voorstel':'voorstellen'}`,
+    // owners view
+    'owners.h1': 'Eigenaren & stemfracties',
+    'owners.total_banner': (frac, n) => `Totale stemfractie: ${frac} (${n} regels in totaal)`,
+    'owners.subtitle': 'Wijzigingen worden automatisch opgeslagen. Wijzig een fractie alleen wanneer het eigendom verandert.',
+    'owners.th.house': 'Huisnr',
+    'owners.th.bldg': 'Geb.nr',
+    'owners.th.name': 'Eigenaar / naam',
+    'owners.th.fraction': 'Fractie',
+    'owners.add': '+ Eigenaar toevoegen',
+    'owners.replace_from_file': 'Eigenaren uit bestand vervangen…',
+    'owners.btn.delete': 'Verwijderen',
+    // new session
+    'new.h1': 'Nieuwe stemsessie',
+    'new.title_label': 'Titel van de vergadering',
+    'new.title_default': 'VvE-vergadering op PEAK NOORDERPLASSEN',
+    'new.date': 'Datum',
+    'new.create': 'Sessie aanmaken →',
+    // step bar
+    'step.setup': '① Voorbereiden',
+    'step.checkin': '② Aanmelden',
+    'step.vote': '③ Stemmen invoeren',
+    'step.results': '④ Uitslag',
+    // session shell
+    'session.not_found': 'Sessie niet gevonden.',
+    'session.closed_banner': ts => `🔒 Deze sessie is gesloten — alleen-lezen. Gesloten op ${ts}.`,
+    'session.reopen': 'Heropenen om te bewerken',
+    // setup tab
+    'setup.meeting_details': 'Vergaderdetails',
+    'setup.title_field': 'Titel van de vergadering',
+    'setup.date_field': 'Datum',
+    'setup.resolutions_h2': 'Voorstellen voor deze vergadering',
+    'setup.resolutions_help': 'Elk voorstel kent drie antwoorden: <b>Voor</b>, <b>Tegen</b>, <b>Met de meerderheid</b>. "Met de meerderheid"-stemmen tellen mee voor de leidende kant.',
+    'setup.title_placeholder': 'Titel van het voorstel',
+    'setup.move_up': 'Omhoog verplaatsen',
+    'setup.move_down': 'Omlaag verplaatsen',
+    'setup.delete_res_title': 'Dit voorstel verwijderen',
+    'setup.btn.delete': 'Verwijderen',
+    'setup.details_label': 'Toelichting (wordt voorgelezen tijdens de vergadering)',
+    'setup.details_placeholder': 'Volledige tekst van het voorstel…',
+    'setup.requires_2_3': 'Vereist <b>2/3 quorum + 2/3 meerderheid</b>',
+    'setup.compare_against': 'Vergelijk de meerderheid met',
+    'setup.tb.present': 'aanwezige eigenaren in de vergadering',
+    'setup.tb.cast': 'daadwerkelijk uitgebrachte stemmen op dit voorstel',
+    'setup.tb.total': 'alle eigenaren in het gebouw',
+    'setup.no_resolutions': 'Nog geen voorstellen. Klik hieronder op "+ Voorstel toevoegen".',
+    'setup.add_res': '+ Voorstel toevoegen',
+    'setup.continue': 'Verder → Aanmelden',
+    // check-in
+    'checkin.banner.no23': 'Geen voorstellen in deze sessie vereisen een 2/3-quorum — alleen gewone meerderheid. Vink aan wie aanwezig is en ga verder.',
+    'checkin.banner.reached': (n, total, p, t, pct, thr) => `<b>2/3-quorum gehaald ✓</b> — ${n} van ${total} eigenaren, fractie <b>${p}</b> / ${t} (${pct}%) ≥ drempel ${thr}.`,
+    'checkin.banner.short': (n, p, t, thr, pct) => `<b>2/3-quorum nog niet gehaald</b> — ${n} eigenaren, fractie <b>${p}</b> / ${t}. Er is minstens <b>${thr}</b> (${pct}%) nodig. Voorstellen die 2/3 vereisen worden uitgesteld totdat dit gehaald wordt.`,
+    'checkin.owners_label': (n, total) => `<b>${n}</b> / ${total} eigenaren`,
+    'checkin.fraction_label': (p, t) => `Fractie <b>${p}</b> / ${t}`,
+    'checkin.badge.reached': '2/3-quorum ✓',
+    'checkin.badge.need': thr => `Heeft ${thr} nodig`,
+    'checkin.badge.no23': 'Geen 2/3 vereist',
+    'checkin.search_placeholder': 'Zoeken op huisnr, eigenaar…',
+    'checkin.start_voting': 'Stemmen starten →',
+    'checkin.card.fraction': frac => `Fractie ${frac}`,
+    'checkin.no_proxy': '— Geen volmacht —',
+    'checkin.proxy_via': h => `✓ Stemt via huis #${h}`,
+    'checkin.present_title': 'Aanwezig',
+    // vote entry
+    'vote.h2': 'Stembiljetten invoeren',
+    'vote.progress': (done, total) => `${done} / ${total} klaar`,
+    'vote.view_results': 'Uitslag bekijken →',
+    'vote.pick_help': 'Kies een huisnummer om dat stembiljet in te voeren of te wijzigen. Huizen met ✓ hebben al alle voorstellen ingevuld. Stembiljetten met een <b>volmacht</b> (blauw) worden uitgebracht door een ander huis.',
+    'vote.via_short': h => ` (via #${h})`,
+    'vote.unknown_house': 'Onbekend huis.',
+    'vote.proxy_note': h => `Dit stembiljet wordt uitgebracht door volmachthouder huis #${h}.`,
+    'vote.btn.agree': 'Voor',
+    'vote.btn.disagree': 'Tegen',
+    'vote.btn.majority': 'Met de meerderheid',
+    'vote.back_to_list': '← Terug naar lijst',
+    'vote.ballot_h2': h => `Stembiljet — huis #${h}`,
+    'vote.fraction_inline': frac => `· fractie ${frac}`,
+    'vote.clear': 'Stembiljet wissen',
+    'vote.done': 'Klaar — terug naar lijst',
+    'vote.badge.requires_2_3': '2/3',
+    // results
+    'results.h2': 'Uitslag',
+    'results.badge.reached': '2/3-quorum gehaald',
+    'results.badge.not_reached': '2/3-quorum NIET gehaald',
+    'results.badge.no23': 'Geen 2/3 vereist',
+    'results.save_csv': 'Stemmen opslaan als spreadsheet (CSV)',
+    'results.close_session': 'Sessie sluiten',
+    'results.closed': 'GESLOTEN',
+    'results.summary': (p, t, pct) => `Aanwezige fractie: <b>${p}</b> van ${t} (${pct}%).`,
+    'results.summary_with_threshold': (p, t, pct, thr) => `Aanwezige fractie: <b>${p}</b> van ${t} (${pct}%). 2/3-drempel: ${thr}.`,
+    'results.no_resolutions': 'Nog geen voorstellen om te scoren.',
+    'results.requires_2_3': '2/3 vereist',
+    'results.verdict.APPROVED': 'AANGENOMEN',
+    'results.verdict.REJECTED': 'VERWORPEN',
+    'results.verdict.POSTPONED': 'UITGESTELD',
+    'results.kv.agree': 'Voor',
+    'results.kv.disagree': 'Tegen',
+    'results.kv.majority': 'Met de meerderheid',
+    'results.kv.participation': 'Deelname',
+    'results.kv.participation_value': (cast, t) => `${cast} van ${t}`,
+    'results.kv.winning': 'Winnende kant',
+    'results.kv.winning_value': (side, total) => `${side} (totaal ${total})`,
+    'results.kv.threshold': '2/3-drempel',
+    'results.kv.threshold_value': (val, base) => `${val} (van ${base})`,
+    'results.side.AGREE': 'VOOR',
+    'results.side.DISAGREE': 'TEGEN',
+    'results.side.TIE': 'GELIJK',
+    'results.tb.present': 'aanwezigen',
+    'results.tb.cast': 'uitgebrachte stemmen',
+    'results.tb.total': 'alle eigenaren',
+    'results.bar.agree': 'Voor',
+    'results.bar.majority': 'Met de meerderheid',
+    'results.bar.disagree': 'Tegen',
+    'results.bar.absent': 'Afwezig / niet gestemd',
+    'results.reason.quorum_not_reached': 'Het quorum (2/3 aanwezigheid) is niet gehaald.',
+    'results.reason.no_votes': 'Geen stemmen uitgebracht.',
+    'results.reason.agree_2_3_pass': (wt, baseLabel, base, thr) => `Voor+Meerderheid (${wt}) ≥ 2/3 van ${baseLabel} (${base}) = ${thr}.`,
+    'results.reason.agree_2_3_fail': (wt, baseLabel, base, thr) => `Voor+Meerderheid (${wt}) < 2/3 van ${baseLabel} (${base}) = ${thr}.`,
+    'results.reason.disagree_leads': (dm, a) => `De tegen-kant leidt (${dm} tegen ${a}).`,
+    'results.reason.agree_wins': (wt, d) => `Voor+Meerderheid (${wt}) > Tegen (${d}).`,
+    'results.reason.disagree_wins': (wt, a) => `Tegen+Meerderheid (${wt}) > Voor (${a}).`,
+    'results.reason.tied': (a, d) => `Gelijkstand (${a} tegen ${d}).`,
+    // audit
+    'audit.h2': 'Logboek',
+    'audit.events': n => `${n} ${n===1?'gebeurtenis':'gebeurtenissen'}`,
+    'audit.save_csv': 'Logboek opslaan als spreadsheet (CSV)',
+    'audit.no_events': 'Nog geen gebeurtenissen.',
+    // save / load all data
+    'io.h1': 'Alles opslaan / inladen',
+    'io.save.h3': 'Alles opslaan naar een bestand',
+    'io.save.p': 'Slaat alle eigenaren, alle sessies en instellingen op als één bestand. Bewaar het op een veilige plek (USB-stick, Dropbox, mail naar uzelf).',
+    'io.save.btn': 'Alles opslaan naar een bestand',
+    'io.load.h3': 'Alles inladen vanuit een bestand',
+    'io.load.p': 'Vervangt alle huidige gegevens met wat er in het gekozen bestand staat. <b>Alles wat niet in het bestand staat raakt u kwijt.</b>',
+    'io.load.choose': 'Kies een bestand…',
+    'io.load.btn': 'Inladen vanuit het gekozen bestand',
+    'io.reset.h3': 'Alles wissen',
+    'io.reset.p': 'Verwijdert alle sessies en zet de eigenarenlijst terug naar de oorspronkelijke lijst. Sla eerst een back-up op als u deze gegevens later nodig zou kunnen hebben.',
+    'io.reset.btn': 'Alles wissen',
+    // crumb
+    'crumb.home': 'Vergaderingen',
+    'crumb.owners': 'Eigenaren',
+    'crumb.new': 'Nieuwe sessie',
+    'crumb.session_session': 'Sessie',
+    'crumb.io': 'Alles opslaan / inladen',
+    // toasts
+    'toast.session_deleted': 'Sessie verwijderd',
+    'toast.voting_started': 'Stemmen gestart',
+    'toast.session_closed': 'Sessie gesloten (alleen-lezen)',
+    'toast.session_reopened': 'Sessie heropend',
+    'toast.everything_reset': 'Alles is gewist',
+    'toast.loaded_success': 'Succesvol ingeladen',
+    'toast.session_locked': 'Sessie is gesloten — heropenen om te bewerken',
+    'toast.loaded_owners': n => `${n} eigenaren ingeladen`,
+    'toast.loaded_owners_and_sessions': (n, s) => `${n} eigenaren en ${s} sessies ingeladen`,
+    'toast.session_opened': (title, n) => `Sessie "${title}" geopend (${n} voorstellen)`,
+    'toast.could_not_open': msg => `Bestand kon niet worden geopend: ${msg}`,
+    'toast.could_not_load': msg => `Bestand kon niet worden ingeladen: ${msg}`,
+    // confirms
+    'confirm.delete_session': 'Deze sessie definitief verwijderen?',
+    'confirm.delete_owner': h => `Eigenaar #${h} verwijderen? De totale fractie verandert hierdoor.`,
+    'confirm.delete_resolution': 'Dit voorstel verwijderen?',
+    'confirm.clear_ballot': h => `Alle stemmen voor huis #${h} wissen?`,
+    'confirm.close_session': 'Deze sessie sluiten? Hij wordt dan alleen-lezen. U kunt hem altijd weer heropenen voor correcties.',
+    'confirm.reopen_session': 'Deze sessie heropenen voor bewerking? Dit wordt geregistreerd in het logboek.',
+    'confirm.factory_reset': 'ALLE sessies verwijderen en de eigenarenlijst terugzetten naar de oorspronkelijke lijst? Dit kan niet ongedaan worden gemaakt.',
+    'confirm.restore_backup': 'Dit vervangt ALLE huidige gegevens (eigenaren en alle sessies) door wat er in het bestand staat. Doorgaan?',
+    'confirm.full_backup_replace': 'Dit bestand is een volledige back-up. Het zal ALLE huidige gegevens vervangen (eigenaren en alle sessies). Doorgaan?',
+    'confirm.replace_owners': (cur, neu) => `De huidige ${cur} eigenaren vervangen door ${neu} uit dit bestand? (Bestaande sessies blijven behouden.)`,
+    'confirm.replace_session': title => `Een sessie genaamd "${title}" staat al op dit apparaat. Vervangen door die uit dit bestand?`,
+    'confirm.start_voting_no_quorum_with23': (p, t) => `Quorum (2/3 aanwezigheid) is NIET gehaald: ${p} van ${t}.\n\nVoorstellen die een 2/3-meerderheid vereisen worden gemarkeerd als UITGESTELD. Voorstellen met gewone meerderheid kunnen wel worden besloten.\n\nU kunt altijd terugkomen om de aanwezigheid bij te werken. Stemmen starten?`,
+    'confirm.start_voting_no_quorum_simple': (p, t) => `Quorum (2/3 aanwezigheid) is NIET gehaald: ${p} van ${t}.\n\nGeen enkel voorstel vereist 2/3, dus dit is geen probleem. Stemmen starten?`,
+    // alerts / inline errors
+    'alert.duplicate_house': (n, initial) => `Huisnummer #${n} is al in gebruik door een andere eigenaar. Teruggezet naar ${initial}.`,
+    'error.choose_file_first': 'Kies eerst een bestand met de knop hierboven.',
+    'error.not_a_session_file': 'Dit bestand lijkt geen sessiebestand te zijn.',
+    'error.not_an_all_data_file': "Dit bestand lijkt geen 'alles'-bestand te zijn.",
+    'error.not_an_owners_file': 'Dit bestand bevat geen eigenarenlijst.',
+    'error.owners_malformed': 'Het eigenarenbestand is leeg of beschadigd.',
+    // defaults used in actions
+    'default.session_title': 'VvE-vergadering',
+    'default.new_resolution': 'Nieuw voorstel',
+    'default.new_owner': 'Nieuwe eigenaar',
+  },
+
+  en: {
+    'btn.back': '← Back',
+    'btn.cancel': 'Cancel',
+    'btn.home': '← Home',
+    'btn.no_file_chosen': 'No file chosen',
+    'tab.setup': 'setup',
+    'tab.checkin': 'check-in',
+    'tab.vote': 'enter votes',
+    'tab.results': 'results',
+    'tab.audit': 'audit log',
+    'saved.now': '✓ Saved',
+    'saved.ago': s => `✓ Saved ${s}s ago`,
+    'logo.title': 'Go to Home',
+    'lang.switch_title': 'Switch language',
+    'welcome.h1': 'Welcome',
+    'welcome.h2': 'First step: load the owner list',
+    'welcome.p1': 'This tool needs the VVE owner data (house numbers, owner names, voting fractions) before you can run a meeting. The board distributes this as a file.',
+    'welcome.p2': 'Pick the file you received to get started.',
+    'welcome.choose_owners': 'Choose owner file…',
+    'welcome.or_full_backup': 'Or load a full backup',
+    'welcome.no_file': "Don't have one? Ask the board for the VVE owner data file.",
+    'home.h1': 'Meetings',
+    'home.total_summary': (n, frac) => `${n} owners · total voting fraction <b>${frac}</b>.`,
+    'home.new_session': '+ New voting session',
+    'home.manage_owners': 'Manage owners',
+    'home.save_load_all': 'Save / Load all data',
+    'home.past_current': 'Past & current sessions',
+    'home.open_session_from_file': 'Open session from file…',
+    'home.open_from_file_title': 'Add a session that someone shared with you',
+    'home.no_sessions': 'No sessions yet.',
+    'home.session.open': 'Open',
+    'home.session.more_actions': 'More actions',
+    'home.kebab.view_audit': 'View audit log',
+    'home.kebab.save_to_file': 'Save to file',
+    'home.kebab.delete': 'Delete',
+    'home.badge.setup': 'Setup',
+    'home.badge.checkin': 'Check-in',
+    'home.badge.voting': 'Voting',
+    'home.badge.approved': (n, t) => `${n}/${t} approved`,
+    'home.resolutions_count': n => `${n} resolution${n===1?'':'s'}`,
+    'owners.h1': 'Owners & voting fractions',
+    'owners.total_banner': (frac, n) => `Total voting fraction: ${frac} (across ${n} entries)`,
+    'owners.subtitle': 'Edits are saved automatically. Change a fraction only when ownership changes.',
+    'owners.th.house': 'House #',
+    'owners.th.bldg': 'Bldg #',
+    'owners.th.name': 'Owner / Name',
+    'owners.th.fraction': 'Fraction',
+    'owners.add': '+ Add owner',
+    'owners.replace_from_file': 'Replace owners from file…',
+    'owners.btn.delete': 'Delete',
+    'new.h1': 'New voting session',
+    'new.title_label': 'Meeting title',
+    'new.title_default': 'VVE meeting at PEAK NOORDERPLASSEN',
+    'new.date': 'Date',
+    'new.create': 'Create session →',
+    'step.setup': '① Setup',
+    'step.checkin': '② Check-in',
+    'step.vote': '③ Enter votes',
+    'step.results': '④ Results',
+    'session.not_found': 'Session not found.',
+    'session.closed_banner': ts => `🔒 This session is closed — read-only. Closed ${ts}.`,
+    'session.reopen': 'Reopen to edit',
+    'setup.meeting_details': 'Meeting details',
+    'setup.title_field': 'Meeting title',
+    'setup.date_field': 'Date',
+    'setup.resolutions_h2': 'Resolutions for this meeting',
+    'setup.resolutions_help': 'Each resolution will offer three answers: <b>Agree</b>, <b>Disagree</b>, <b>With Majority</b>. "With Majority" votes count toward the leading side.',
+    'setup.title_placeholder': 'Resolution title',
+    'setup.move_up': 'Move up',
+    'setup.move_down': 'Move down',
+    'setup.delete_res_title': 'Delete this resolution',
+    'setup.btn.delete': 'Delete',
+    'setup.details_label': 'Details (read out at the meeting)',
+    'setup.details_placeholder': 'Full text of the resolution…',
+    'setup.requires_2_3': 'Requires <b>2/3 quorum + 2/3 majority</b>',
+    'setup.compare_against': 'Compare the majority against',
+    'setup.tb.present': 'owners present at the meeting',
+    'setup.tb.cast': 'votes actually cast on this resolution',
+    'setup.tb.total': 'all owners in the building',
+    'setup.no_resolutions': 'No resolutions yet. Click "+ Add resolution" below.',
+    'setup.add_res': '+ Add resolution',
+    'setup.continue': 'Continue → Check-in',
+    'checkin.banner.no23': 'No resolutions in this session require 2/3 quorum — simple majority only. Mark whoever is present and continue.',
+    'checkin.banner.reached': (n, total, p, t, pct, thr) => `<b>2/3 quorum reached ✓</b> — ${n} of ${total} owners, fraction <b>${p}</b> / ${t} (${pct}%) ≥ threshold ${thr}.`,
+    'checkin.banner.short': (n, p, t, thr, pct) => `<b>2/3 quorum not yet reached</b> — Have ${n} owners, fraction <b>${p}</b> / ${t}. Need at least <b>${thr}</b> (${pct}%). Any 2/3 resolution will be postponed until this is reached.`,
+    'checkin.owners_label': (n, total) => `<b>${n}</b> / ${total} owners`,
+    'checkin.fraction_label': (p, t) => `Fraction <b>${p}</b> / ${t}`,
+    'checkin.badge.reached': '2/3 quorum ✓',
+    'checkin.badge.need': thr => `Need ${thr}`,
+    'checkin.badge.no23': 'No 2/3 required',
+    'checkin.search_placeholder': 'Search by house #, owner...',
+    'checkin.start_voting': 'Start voting →',
+    'checkin.card.fraction': frac => `Fraction ${frac}`,
+    'checkin.no_proxy': '— No proxy —',
+    'checkin.proxy_via': h => `✓ Voting via house #${h}`,
+    'checkin.present_title': 'Present',
+    'vote.h2': 'Enter ballots',
+    'vote.progress': (done, total) => `${done} / ${total} done`,
+    'vote.view_results': 'View results →',
+    'vote.pick_help': 'Pick a house number to enter or edit that ballot. Houses with ✓ already have all resolutions filled. <b>Proxied</b> ballots (blue) are cast by another house.',
+    'vote.via_short': h => ` (via #${h})`,
+    'vote.unknown_house': 'Unknown house.',
+    'vote.proxy_note': h => `This ballot is cast by proxy holder house #${h}.`,
+    'vote.btn.agree': 'Agree',
+    'vote.btn.disagree': 'Disagree',
+    'vote.btn.majority': 'With Majority',
+    'vote.back_to_list': '← Back to list',
+    'vote.ballot_h2': h => `Ballot — House #${h}`,
+    'vote.fraction_inline': frac => `· fraction ${frac}`,
+    'vote.clear': 'Clear ballot',
+    'vote.done': 'Done — back to list',
+    'vote.badge.requires_2_3': '2/3',
+    'results.h2': 'Results',
+    'results.badge.reached': '2/3 quorum reached',
+    'results.badge.not_reached': '2/3 quorum NOT reached',
+    'results.badge.no23': 'No 2/3 required',
+    'results.save_csv': 'Save votes as spreadsheet (CSV)',
+    'results.close_session': 'Close session',
+    'results.closed': 'CLOSED',
+    'results.summary': (p, t, pct) => `Present fraction: <b>${p}</b> of ${t} (${pct}%).`,
+    'results.summary_with_threshold': (p, t, pct, thr) => `Present fraction: <b>${p}</b> of ${t} (${pct}%). 2/3 threshold: ${thr}.`,
+    'results.no_resolutions': 'No resolutions to score yet.',
+    'results.requires_2_3': '2/3 required',
+    'results.verdict.APPROVED': 'APPROVED',
+    'results.verdict.REJECTED': 'REJECTED',
+    'results.verdict.POSTPONED': 'POSTPONED',
+    'results.kv.agree': 'Agree',
+    'results.kv.disagree': 'Disagree',
+    'results.kv.majority': 'With Majority',
+    'results.kv.participation': 'Participation',
+    'results.kv.participation_value': (cast, t) => `${cast} of ${t}`,
+    'results.kv.winning': 'Winning side',
+    'results.kv.winning_value': (side, total) => `${side} (total ${total})`,
+    'results.kv.threshold': '2/3 threshold',
+    'results.kv.threshold_value': (val, base) => `${val} (of ${base})`,
+    'results.side.AGREE': 'AGREE',
+    'results.side.DISAGREE': 'DISAGREE',
+    'results.side.TIE': 'TIE',
+    'results.tb.present': 'present',
+    'results.tb.cast': 'votes cast',
+    'results.tb.total': 'all owners',
+    'results.bar.agree': 'Agree',
+    'results.bar.majority': 'With Majority',
+    'results.bar.disagree': 'Disagree',
+    'results.bar.absent': 'Absent / not voted',
+    'results.reason.quorum_not_reached': 'Quorum (2/3 presence) was not reached.',
+    'results.reason.no_votes': 'No votes cast.',
+    'results.reason.agree_2_3_pass': (wt, baseLabel, base, thr) => `Agree+Majority (${wt}) ≥ 2/3 of ${baseLabel} (${base}) = ${thr}.`,
+    'results.reason.agree_2_3_fail': (wt, baseLabel, base, thr) => `Agree+Majority (${wt}) < 2/3 of ${baseLabel} (${base}) = ${thr}.`,
+    'results.reason.disagree_leads': (dm, a) => `Disagree side leads (${dm} vs ${a}).`,
+    'results.reason.agree_wins': (wt, d) => `Agree+Majority (${wt}) > Disagree (${d}).`,
+    'results.reason.disagree_wins': (wt, a) => `Disagree+Majority (${wt}) > Agree (${a}).`,
+    'results.reason.tied': (a, d) => `Tied (${a} vs ${d}).`,
+    'audit.h2': 'Audit log',
+    'audit.events': n => `${n} event${n===1?'':'s'}`,
+    'audit.save_csv': 'Save log as spreadsheet (CSV)',
+    'audit.no_events': 'No events yet.',
+    'io.h1': 'Save / Load all data',
+    'io.save.h3': 'Save everything to a file',
+    'io.save.p': 'Saves all owners, all sessions, and settings as one file. Keep it somewhere safe (USB stick, Dropbox, email to yourself).',
+    'io.save.btn': 'Save everything to a file',
+    'io.load.h3': 'Load everything from a file',
+    'io.load.p': "Replaces all current data with what's in the chosen file. <b>You will lose anything not in the file.</b>",
+    'io.load.choose': 'Choose a file…',
+    'io.load.btn': 'Load from the selected file',
+    'io.reset.h3': 'Reset everything',
+    'io.reset.p': 'Deletes all sessions and resets owners to the original list. Save a backup first if you might need this data later.',
+    'io.reset.btn': 'Reset everything',
+    'crumb.home': 'Meetings',
+    'crumb.owners': 'Owners',
+    'crumb.new': 'New session',
+    'crumb.session_session': 'Session',
+    'crumb.io': 'Save / Load all data',
+    'toast.session_deleted': 'Session deleted',
+    'toast.voting_started': 'Voting started',
+    'toast.session_closed': 'Session closed (read-only)',
+    'toast.session_reopened': 'Session reopened',
+    'toast.everything_reset': 'Everything has been reset',
+    'toast.loaded_success': 'Loaded successfully',
+    'toast.session_locked': 'Session is closed — reopen to edit',
+    'toast.loaded_owners': n => `Loaded ${n} owners`,
+    'toast.loaded_owners_and_sessions': (n, s) => `Loaded ${n} owners and ${s} sessions`,
+    'toast.session_opened': (title, n) => `Session "${title}" opened (${n} resolutions)`,
+    'toast.could_not_open': msg => `Could not open file: ${msg}`,
+    'toast.could_not_load': msg => `Could not load file: ${msg}`,
+    'confirm.delete_session': 'Delete this session permanently?',
+    'confirm.delete_owner': h => `Delete owner #${h}? Total fraction will change.`,
+    'confirm.delete_resolution': 'Delete this resolution?',
+    'confirm.clear_ballot': h => `Clear all votes for house #${h}?`,
+    'confirm.close_session': 'Close this session? It becomes read-only. You can reopen any time to make corrections.',
+    'confirm.reopen_session': 'Reopen this session for editing? This will be recorded in the audit log.',
+    'confirm.factory_reset': 'Delete ALL sessions and reset owners to the original list? This cannot be undone.',
+    'confirm.restore_backup': 'This will replace ALL current data (owners and every session) with what is in the file. Continue?',
+    'confirm.full_backup_replace': 'This file is a full backup. It will replace ALL current data (owners and every session). Continue?',
+    'confirm.replace_owners': (cur, neu) => `Replace the current ${cur} owners with ${neu} from this file? (Existing sessions are kept.)`,
+    'confirm.replace_session': title => `A session called "${title}" is already on this device. Replace it with the one in this file?`,
+    'confirm.start_voting_no_quorum_with23': (p, t) => `Quorum (2/3 presence) is NOT reached: ${p} of ${t}.\n\nAny resolutions requiring 2/3 majority will be marked POSTPONED. Simple-majority resolutions can still be decided.\n\nYou can always come back to update attendance. Start voting?`,
+    'confirm.start_voting_no_quorum_simple': (p, t) => `Quorum (2/3 presence) is NOT reached: ${p} of ${t}.\n\nNo resolutions require 2/3, so this is fine. Start voting?`,
+    'alert.duplicate_house': (n, initial) => `House #${n} is already used by another owner. Reverting to ${initial}.`,
+    'error.choose_file_first': 'Choose a file first using the button above.',
+    'error.not_a_session_file': "This doesn't look like a session file.",
+    'error.not_an_all_data_file': "This doesn't look like an all-data file.",
+    'error.not_an_owners_file': "This file doesn't contain an owners list.",
+    'error.owners_malformed': 'Owners file looks empty or malformed.',
+    'default.session_title': 'VVE Meeting',
+    'default.new_resolution': 'New resolution',
+    'default.new_owner': 'New owner',
+  }
+};
+
+function t(key, ...args) {
+  const lang = (typeof State !== 'undefined' && State.lang) || 'nl';
+  const dict = i18n[lang] || i18n.nl;
+  let val = dict[key];
+  if (val === undefined && lang !== 'en') val = i18n.en[key];
+  if (val === undefined) return key;
+  return typeof val === 'function' ? val(...args) : val;
+}
+
+function currentLocale() {
+  return (typeof State !== 'undefined' && State.lang === 'en') ? 'en-GB' : 'nl-NL';
+}
 
 /* ---------- STORAGE ---------- */
 const STORE_KEY = "vve.v1";
@@ -348,7 +825,7 @@ const Saved = {
     if (!el) return;
     if (!Saved.ts) { el.textContent = ''; return; }
     const secs = Math.round((Date.now() - Saved.ts) / 1000);
-    el.textContent = secs < 3 ? '✓ Saved' : `✓ Saved ${secs}s ago`;
+    el.textContent = secs < 3 ? t('saved.now') : t('saved.ago', secs);
   }
 };
 setInterval(() => Saved.render(), 2000);
@@ -361,6 +838,7 @@ const State = {
   sessionView: 'setup', // setup | checkin | vote | results | audit
   voteHouse: null,
   checkInSearch: '',
+  lang: 'nl',           // 'nl' | 'en' — UI language only, never affects vote math
   init() {
     let d = Storage.load();
     if (!d) {
@@ -372,13 +850,20 @@ const State = {
       Storage.save(d);
     }
     State.data = d;
+    State.lang = localStorage.getItem(LANG_KEY) || 'nl';
+    document.documentElement.setAttribute('lang', State.lang === 'en' ? 'en-GB' : 'nl-NL');
+  },
+  setLang(l) {
+    State.lang = (l === 'en') ? 'en' : 'nl';
+    localStorage.setItem(LANG_KEY, State.lang);
+    document.documentElement.setAttribute('lang', State.lang === 'en' ? 'en-GB' : 'nl-NL');
   },
   persist() { Storage.save(State.data); }
 };
 
 /* ---------- UTIL ---------- */
 const uid = () => crypto.randomUUID ? crypto.randomUUID() : ('id-' + Date.now() + '-' + Math.random().toString(36).slice(2,8));
-const fmt = n => Number(n).toLocaleString('en-US');
+const fmt = n => Number(n).toLocaleString(currentLocale());
 const pad2 = n => String(n).padStart(2, '0');
 const localDate = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
 const localStamp = (d = new Date()) => `${localDate(d)}-${pad2(d.getHours())}-${pad2(d.getMinutes())}-${pad2(d.getSeconds())}`;
@@ -386,7 +871,13 @@ const formatDateLong = (isoDate) => {
   if (!isoDate) return '';
   const d = new Date(isoDate + 'T00:00:00');
   if (isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+  return d.toLocaleDateString(currentLocale(), { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+};
+const formatTimestamp = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString(currentLocale());
 };
 const esc = s => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -471,49 +962,50 @@ const Calc = {
     return { A, D, M, cast, present };
   },
   resolutionVerdict(session, owners, settings, resolution) {
-    const t = Calc.resolutionTally(session, owners, resolution.id);
-    const { A, D, M, cast, present } = t;
+    const tally = Calc.resolutionTally(session, owners, resolution.id);
+    const { A, D, M, cast, present } = tally;
     const q = Calc.quorumReached(session, owners, settings);
-    let winnerSide = (A === D) ? 'TIE' : (A > D ? 'AGREE' : 'DISAGREE');
-    let winningTotal = (winnerSide === 'AGREE') ? (A + M) : (winnerSide === 'DISAGREE') ? (D + M) : (A + M);
-    let losingTotal  = (winnerSide === 'AGREE') ? D : (winnerSide === 'DISAGREE') ? A : D;
+    const winnerSide = (A === D) ? 'TIE' : (A > D ? 'AGREE' : 'DISAGREE');
+    const winningTotal = (winnerSide === 'AGREE') ? (A + M) : (winnerSide === 'DISAGREE') ? (D + M) : (A + M);
+    const losingTotal  = (winnerSide === 'AGREE') ? D : (winnerSide === 'DISAGREE') ? A : D;
 
-    let verdict, reason;
+    // Pure numeric/code outputs — no display strings. View layer renders reasons via i18n.
+    let verdict, reasonCode = null, reasonData = null;
     if (resolution.requires2_3) {
       if (!q.reached) {
         verdict = 'POSTPONED';
-        reason = 'Quorum (2/3 presence) was not reached.';
+        reasonCode = 'quorum_not_reached';
       } else {
         const base = (resolution.thresholdBase === 'cast') ? cast
                    : (resolution.thresholdBase === 'total') ? q.T
                    : present;
         const threshold = (2/3) * base;
-        const baseLabel = (resolution.thresholdBase === 'cast') ? 'votes cast'
-                        : (resolution.thresholdBase === 'total') ? 'all owners'
-                        : 'present fraction';
+        const baseKey = (resolution.thresholdBase === 'cast') ? 'cast'
+                      : (resolution.thresholdBase === 'total') ? 'total'
+                      : 'present';
+        reasonData = { base, threshold, baseKey };
         if (winnerSide === 'AGREE' && winningTotal >= threshold) {
           verdict = 'APPROVED';
-          reason = `Agree+Majority (${fmt(winningTotal)}) ≥ 2/3 of ${baseLabel} (${fmt(base)}) = ${threshold.toFixed(2)}.`;
+          reasonCode = 'agree_2_3_pass';
         } else {
           verdict = 'REJECTED';
-          if (winnerSide !== 'AGREE') reason = `Disagree side leads (${fmt(D + M)} vs ${fmt(A)}).`;
-          else reason = `Agree+Majority (${fmt(winningTotal)}) < 2/3 of ${baseLabel} (${fmt(base)}) = ${threshold.toFixed(2)}.`;
+          reasonCode = (winnerSide !== 'AGREE') ? 'disagree_leads' : 'agree_2_3_fail';
         }
       }
     } else {
-      if (cast === 0) { verdict = 'REJECTED'; reason = 'No votes cast.'; }
+      if (cast === 0) { verdict = 'REJECTED'; reasonCode = 'no_votes'; }
       else if (winnerSide === 'AGREE' && winningTotal > losingTotal) {
         verdict = 'APPROVED';
-        reason = `Agree+Majority (${fmt(winningTotal)}) > Disagree (${fmt(D)}).`;
+        reasonCode = 'agree_wins';
       } else if (winnerSide === 'DISAGREE') {
         verdict = 'REJECTED';
-        reason = `Disagree+Majority (${fmt(winningTotal)}) > Agree (${fmt(A)}).`;
+        reasonCode = 'disagree_wins';
       } else {
         verdict = 'REJECTED';
-        reason = `Tied (${fmt(A)} vs ${fmt(D)}).`;
+        reasonCode = 'tied';
       }
     }
-    return { tally: t, winnerSide, winningTotal, losingTotal, verdict, reason, quorum: q };
+    return { tally, winnerSide, winningTotal, losingTotal, verdict, reasonCode, reasonData, quorum: q };
   }
 };
 
@@ -531,7 +1023,7 @@ const Actions = {
     const today = localDate();
     const id = (date || today) + '-' + uid().slice(0,6);
     const s = {
-      id, title: title || 'VVE Meeting', date: date || today,
+      id, title: title || t('default.session_title'), date: date || today,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), closedAt: null,
       status: 'setup',
       resolutions: [],
@@ -563,18 +1055,18 @@ const Views = {
 home() {
   if (!State.data.owners || State.data.owners.length === 0) {
     return `
-      <h1>Welcome</h1>
+      <h1>${esc(t('welcome.h1'))}</h1>
       <div class="card">
-        <h2 style="margin-top:0">First step: load the owner list</h2>
-        <p>This tool needs the VVE owner data (house numbers, owner names, voting fractions) before you can run a meeting. The board distributes this as a file.</p>
-        <p>Pick the file you received to get started.</p>
+        <h2 style="margin-top:0">${esc(t('welcome.h2'))}</h2>
+        <p>${esc(t('welcome.p1'))}</p>
+        <p>${esc(t('welcome.p2'))}</p>
         <div class="row" style="margin-top:18px">
-          <label class="btn btn-primary btn-big" for="import-owners-file">Choose owner file…</label>
+          <label class="btn btn-primary btn-big" for="import-owners-file">${esc(t('welcome.choose_owners'))}</label>
           <input type="file" id="import-owners-file" accept="application/json" style="display:none" data-action="import-owners-file">
-          <label class="btn btn-big" for="restore-from-home" style="font-weight:normal">Or load a full backup</label>
+          <label class="btn btn-big" for="restore-from-home" style="font-weight:normal">${esc(t('welcome.or_full_backup'))}</label>
           <input type="file" id="restore-from-home" accept="application/json" style="display:none" data-action="import-owners-file">
         </div>
-        <p class="small muted" style="margin-top:16px">Don't have one? Ask the board for the VVE owner data file.</p>
+        <p class="small muted" style="margin-top:16px">${esc(t('welcome.no_file'))}</p>
       </div>
     `;
   }
@@ -584,44 +1076,44 @@ home() {
     if (s.status === 'closed') {
       const all = s.resolutions.map(r => Calc.resolutionVerdict(s, State.data.owners, State.data.settings, r));
       const approved = all.filter(v => v.verdict === 'APPROVED').length;
-      badge = `<span class="badge ok">${approved}/${s.resolutions.length} approved</span>`;
+      badge = `<span class="badge ok">${esc(t('home.badge.approved', approved, s.resolutions.length))}</span>`;
     } else if (s.status === 'voting') {
-      badge = `<span class="badge warn">Voting</span>`;
+      badge = `<span class="badge warn">${esc(t('home.badge.voting'))}</span>`;
     } else if (s.status === 'checkin') {
-      badge = `<span class="badge warn">Check-in</span>`;
+      badge = `<span class="badge warn">${esc(t('home.badge.checkin'))}</span>`;
     } else {
-      badge = `<span class="badge muted">Setup</span>`;
+      badge = `<span class="badge muted">${esc(t('home.badge.setup'))}</span>`;
     }
     return `
       <div class="card row">
         <div class="grow">
           <div><b>${esc(s.title)}</b> &nbsp; <span class="muted small">${esc(formatDateLong(s.date) || s.date)}</span></div>
-          <div class="small muted">${s.resolutions.length} resolution${s.resolutions.length===1?'':'s'} • ${badge}</div>
+          <div class="small muted">${esc(t('home.resolutions_count', s.resolutions.length))} • ${badge}</div>
         </div>
-        <button class="btn btn-primary" data-action="open-session" data-id="${s.id}">Open</button>
+        <button class="btn btn-primary" data-action="open-session" data-id="${s.id}">${esc(t('home.session.open'))}</button>
         <details class="kebab">
-          <summary title="More actions">⋮</summary>
+          <summary title="${esc(t('home.session.more_actions'))}">⋮</summary>
           <div class="kebab-menu">
-            <button data-action="view-audit" data-id="${s.id}">View audit log</button>
-            <button data-action="export-session-by-id" data-id="${s.id}">Save to file</button>
-            <button class="danger" data-action="delete-session" data-id="${s.id}">Delete</button>
+            <button data-action="view-audit" data-id="${s.id}">${esc(t('home.kebab.view_audit'))}</button>
+            <button data-action="export-session-by-id" data-id="${s.id}">${esc(t('home.kebab.save_to_file'))}</button>
+            <button class="danger" data-action="delete-session" data-id="${s.id}">${esc(t('home.kebab.delete'))}</button>
           </div>
         </details>
       </div>`;
-  }).join('') || `<p class="muted">No sessions yet.</p>`;
+  }).join('') || `<p class="muted">${esc(t('home.no_sessions'))}</p>`;
 
   return `
-    <h1>Meetings</h1>
-    <p class="muted">${State.data.owners.length} owners · total voting fraction <b>${fmt(T)}</b>.</p>
+    <h1>${esc(t('home.h1'))}</h1>
+    <p class="muted">${t('home.total_summary', State.data.owners.length, fmt(T))}</p>
     <div class="row">
-      <button class="btn btn-primary btn-big" data-action="goto-new">+ New voting session</button>
-      <button class="btn" data-action="goto-owners">Manage owners</button>
-      <button class="btn" data-action="goto-importexport">Save / Load all data</button>
+      <button class="btn btn-primary btn-big" data-action="goto-new">${esc(t('home.new_session'))}</button>
+      <button class="btn" data-action="goto-owners">${esc(t('home.manage_owners'))}</button>
+      <button class="btn" data-action="goto-importexport">${esc(t('home.save_load_all'))}</button>
     </div>
     <div class="row" style="margin-top:28px; align-items:center">
-      <h2 style="margin:0">Past & current sessions</h2>
+      <h2 style="margin:0">${esc(t('home.past_current'))}</h2>
       <div class="spacer grow"></div>
-      <label class="btn small" for="import-session-file" title="Add a session that someone shared with you" style="display:inline-flex;align-items:center">Open session from file…</label>
+      <label class="btn small" for="import-session-file" title="${esc(t('home.open_from_file_title'))}" style="display:inline-flex;align-items:center">${esc(t('home.open_session_from_file'))}</label>
       <input type="file" id="import-session-file" accept="application/json" style="display:none" data-action="import-session-file">
     </div>
     ${list}
@@ -636,39 +1128,40 @@ owners() {
       <td><input type="number" data-edit-owner="${o.houseNumber}" data-field="buildingNumber" value="${o.buildingNumber ?? ''}" style="width:70px"></td>
       <td><input type="text" data-edit-owner="${o.houseNumber}" data-field="displayName" value="${esc(o.displayName)}"></td>
       <td><input type="number" data-edit-owner="${o.houseNumber}" data-field="fraction" value="${o.fraction}" style="width:90px"></td>
-      <td><button class="btn btn-danger small" data-action="delete-owner" data-id="${o.houseNumber}">Delete</button></td>
+      <td><button class="btn btn-danger small" data-action="delete-owner" data-id="${o.houseNumber}">${esc(t('owners.btn.delete'))}</button></td>
     </tr>`).join('');
 
   return `
-    <h1>Owners & voting fractions</h1>
-    <div class="banner ok"><b>Total voting fraction: ${fmt(T)}</b> (across ${State.data.owners.length} entries)</div>
-    <p class="muted small">Edits are saved automatically. Change a fraction only when ownership changes.</p>
+    <h1>${esc(t('owners.h1'))}</h1>
+    <div class="banner ok"><b>${esc(t('owners.total_banner', fmt(T), State.data.owners.length))}</b></div>
+    <p class="muted small">${esc(t('owners.subtitle'))}</p>
     <table class="t">
-      <thead><tr><th>House #</th><th>Bldg #</th><th>Owner / Name</th><th>Fraction</th><th></th></tr></thead>
+      <thead><tr><th>${esc(t('owners.th.house'))}</th><th>${esc(t('owners.th.bldg'))}</th><th>${esc(t('owners.th.name'))}</th><th>${esc(t('owners.th.fraction'))}</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     <div class="row" style="margin-top:16px">
-      <button class="btn" data-action="add-owner">+ Add owner</button>
-      <label class="btn" for="import-owners-on-owners-page">Replace owners from file…</label>
+      <button class="btn" data-action="add-owner">${esc(t('owners.add'))}</button>
+      <label class="btn" for="import-owners-on-owners-page">${esc(t('owners.replace_from_file'))}</label>
       <input type="file" id="import-owners-on-owners-page" accept="application/json" style="display:none" data-action="import-owners-file">
-      <button class="btn btn-link" data-action="goto-home">← Back</button>
+      <button class="btn btn-link" data-action="goto-home">${esc(t('btn.back'))}</button>
     </div>
   `;
 },
 
 newSession() {
   const today = localDate();
+  const titleDefault = t('new.title_default');
   return `
-    <h1>New voting session</h1>
+    <h1>${esc(t('new.h1'))}</h1>
     <div class="card">
-      <label>Meeting title</label>
-      <input type="text" id="new-title" placeholder="VVE meeting at PEAK NOORDERPLASSEN" value="VVE meeting at PEAK NOORDERPLASSEN">
-      <label>Date</label>
-      <input type="date" id="new-date" value="${today}" oninput="document.getElementById('new-date-pretty').textContent = (function(v){const d=new Date(v+'T00:00:00');return isNaN(d.getTime())?'':d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'long',year:'numeric'})})(this.value)">
+      <label>${esc(t('new.title_label'))}</label>
+      <input type="text" id="new-title" placeholder="${esc(titleDefault)}" value="${esc(titleDefault)}">
+      <label>${esc(t('new.date'))}</label>
+      <input type="date" id="new-date" value="${today}" oninput="App.updateNewDatePretty(this.value)">
       <div class="small muted" id="new-date-pretty" style="margin-top:4px">${esc(formatDateLong(today))}</div>
       <div class="row" style="margin-top:16px">
-        <button class="btn btn-primary btn-big" data-action="create-session">Create session →</button>
-        <button class="btn btn-link" data-action="goto-home">Cancel</button>
+        <button class="btn btn-primary btn-big" data-action="create-session">${esc(t('new.create'))}</button>
+        <button class="btn btn-link" data-action="goto-home">${esc(t('btn.cancel'))}</button>
       </div>
     </div>
   `;
@@ -676,20 +1169,20 @@ newSession() {
 
 stepBar(active) {
   const steps = [
-    { k: 'setup',   l: '① Setup' },
-    { k: 'checkin', l: '② Check-in' },
-    { k: 'vote',    l: '③ Enter votes' },
-    { k: 'results', l: '④ Results' }
+    { k: 'setup',   l: t('step.setup') },
+    { k: 'checkin', l: t('step.checkin') },
+    { k: 'vote',    l: t('step.vote') },
+    { k: 'results', l: t('step.results') }
   ];
   const idx = steps.findIndex(s => s.k === active);
   return `<div class="stepbar">${steps.map((s,i) =>
-    `<div class="step ${i===idx?'active':i<idx?'done':''}" data-action="session-tab" data-tab="${s.k}">${s.l}</div>`
+    `<div class="step ${i===idx?'active':i<idx?'done':''}" data-action="session-tab" data-tab="${s.k}">${esc(s.l)}</div>`
   ).join('')}</div>`;
 },
 
 session() {
   const s = Actions.getSession(State.params.id);
-  if (!s) return `<p>Session not found.</p><button class="btn" data-action="goto-home">Home</button>`;
+  if (!s) return `<p>${esc(t('session.not_found'))}</p><button class="btn" data-action="goto-home">${esc(t('btn.home'))}</button>`;
   let body = '';
   switch (State.sessionView) {
     case 'setup':   body = Views.setupSession(s); break;
@@ -701,8 +1194,8 @@ session() {
   const closedBanner = s.status === 'closed' ? `
     <div class="banner warn" style="position:sticky; top:72px; z-index:6">
       <div class="row">
-        <div class="grow"><b>🔒 This session is closed</b> — read-only. Closed ${s.closedAt ? new Date(s.closedAt).toLocaleString() : ''}.</div>
-        <button class="btn btn-primary" data-action="reopen-session">Reopen to edit</button>
+        <div class="grow">${t('session.closed_banner', s.closedAt ? formatTimestamp(s.closedAt) : '')}</div>
+        <button class="btn btn-primary" data-action="reopen-session">${esc(t('session.reopen'))}</button>
       </div>
     </div>` : '';
   return `
@@ -716,14 +1209,14 @@ session() {
 setupSession(s) {
   const meta = `
     <div class="card">
-      <h2 style="margin-top:0">Meeting details</h2>
+      <h2 style="margin-top:0">${esc(t('setup.meeting_details'))}</h2>
       <div class="row" style="align-items:flex-start">
         <div class="grow">
-          <label style="margin-top:0">Meeting title</label>
+          <label style="margin-top:0">${esc(t('setup.title_field'))}</label>
           <input type="text" data-edit-session="title" value="${esc(s.title)}">
         </div>
         <div style="min-width:200px">
-          <label style="margin-top:0">Date</label>
+          <label style="margin-top:0">${esc(t('setup.date_field'))}</label>
           <input type="date" data-edit-session="date" value="${esc(s.date)}">
           <div class="small muted" id="session-date-pretty" style="margin-top:4px">${esc(formatDateLong(s.date))}</div>
         </div>
@@ -733,43 +1226,43 @@ setupSession(s) {
   const rows = s.resolutions.map((r, i) => `
     <div class="resolution-block" data-index="${i+1}">
       <div class="row" style="align-items:center">
-        <input type="text" class="res-title grow" data-edit-res="${r.id}" data-field="title" value="${esc(r.title)}" placeholder="Resolution title">
+        <input type="text" class="res-title grow" data-edit-res="${r.id}" data-field="title" value="${esc(r.title)}" placeholder="${esc(t('setup.title_placeholder'))}">
         <div class="res-controls">
-          <button class="btn small" data-action="move-res" data-id="${r.id}" data-dir="-1" ${i===0?'disabled':''} title="Move up">↑</button>
-          <button class="btn small" data-action="move-res" data-id="${r.id}" data-dir="1" ${i===s.resolutions.length-1?'disabled':''} title="Move down">↓</button>
-          <button class="btn small btn-danger" data-action="delete-res" data-id="${r.id}" title="Delete this resolution">Delete</button>
+          <button class="btn small" data-action="move-res" data-id="${r.id}" data-dir="-1" ${i===0?'disabled':''} title="${esc(t('setup.move_up'))}">↑</button>
+          <button class="btn small" data-action="move-res" data-id="${r.id}" data-dir="1" ${i===s.resolutions.length-1?'disabled':''} title="${esc(t('setup.move_down'))}">↓</button>
+          <button class="btn small btn-danger" data-action="delete-res" data-id="${r.id}" title="${esc(t('setup.delete_res_title'))}">${esc(t('setup.btn.delete'))}</button>
         </div>
       </div>
-      <div class="res-desc-label">Details (read out at the meeting)</div>
-      <textarea data-edit-res="${r.id}" data-field="description" placeholder="Full text of the resolution…">${esc(r.description||'')}</textarea>
+      <div class="res-desc-label">${esc(t('setup.details_label'))}</div>
+      <textarea data-edit-res="${r.id}" data-field="description" placeholder="${esc(t('setup.details_placeholder'))}">${esc(r.description||'')}</textarea>
       <div class="res-2_3">
         <label>
           <input type="checkbox" data-edit-res="${r.id}" data-field="requires2_3" ${r.requires2_3?'checked':''}>
-          <span>Requires <b>2/3 quorum + 2/3 majority</b></span>
+          <span>${t('setup.requires_2_3')}</span>
         </label>
         ${r.requires2_3 ? `
         <div class="res-threshold">
-          <span>Compare the majority against</span>
+          <span>${esc(t('setup.compare_against'))}</span>
           <select data-edit-res="${r.id}" data-field="thresholdBase">
-            <option value="present" ${r.thresholdBase==='present'?'selected':''}>owners present at the meeting</option>
-            <option value="cast" ${r.thresholdBase==='cast'?'selected':''}>votes actually cast on this resolution</option>
-            <option value="total" ${r.thresholdBase==='total'?'selected':''}>all owners in the building</option>
+            <option value="present" ${r.thresholdBase==='present'?'selected':''}>${esc(t('setup.tb.present'))}</option>
+            <option value="cast" ${r.thresholdBase==='cast'?'selected':''}>${esc(t('setup.tb.cast'))}</option>
+            <option value="total" ${r.thresholdBase==='total'?'selected':''}>${esc(t('setup.tb.total'))}</option>
           </select>
         </div>` : ''}
       </div>
     </div>
-  `).join('') || `<p class="muted">No resolutions yet. Click "+ Add resolution" below.</p>`;
+  `).join('') || `<p class="muted">${esc(t('setup.no_resolutions'))}</p>`;
 
   return `
     ${meta}
     <div class="card">
-      <h2 style="margin-top:0">Resolutions for this meeting</h2>
-      <p class="muted small">Each resolution will offer three answers: <b>Agree</b>, <b>Disagree</b>, <b>With Majority</b>. "With Majority" votes count toward the leading side.</p>
+      <h2 style="margin-top:0">${esc(t('setup.resolutions_h2'))}</h2>
+      <p class="muted small">${t('setup.resolutions_help')}</p>
       ${rows}
       <div class="row" style="margin-top:14px">
-        <button class="btn" data-action="add-res">+ Add resolution</button>
+        <button class="btn" data-action="add-res">${esc(t('setup.add_res'))}</button>
         <div class="spacer grow"></div>
-        <button class="btn btn-primary btn-big" data-action="session-tab" data-tab="checkin" ${s.resolutions.length===0?'disabled':''}>Continue → Check-in</button>
+        <button class="btn btn-primary btn-big" data-action="session-tab" data-tab="checkin" ${s.resolutions.length===0?'disabled':''}>${esc(t('setup.continue'))}</button>
       </div>
     </div>
   `;
@@ -783,11 +1276,11 @@ checkin(s) {
   const has2_3 = s.resolutions.some(r => r.requires2_3);
   let banner;
   if (!has2_3) {
-    banner = `<div class="banner" style="border-color:var(--line-strong); background:#faf6ee; color:var(--muted)">No resolutions in this session require 2/3 quorum — simple majority only. Mark whoever is present and continue.</div>`;
+    banner = `<div class="banner" style="border-color:var(--line-strong); background:#faf6ee; color:var(--muted)">${esc(t('checkin.banner.no23'))}</div>`;
   } else if (q.reached) {
-    banner = `<div class="banner ok"><b>2/3 quorum reached ✓</b> — ${presentCount} of ${owners.length} owners, fraction <b>${fmt(q.P)}</b> / ${fmt(q.T)} (${pct}%) ≥ threshold ${fmt(Math.ceil(q.threshold))}.</div>`;
+    banner = `<div class="banner ok">${t('checkin.banner.reached', presentCount, owners.length, fmt(q.P), fmt(q.T), pct, fmt(Math.ceil(q.threshold)))}</div>`;
   } else {
-    banner = `<div class="banner bad"><b>2/3 quorum not yet reached</b> — Have ${presentCount} owners, fraction <b>${fmt(q.P)}</b> / ${fmt(q.T)}. Need at least <b>${fmt(Math.ceil(q.threshold))}</b> (${(State.data.settings.quorumFraction*100).toFixed(1)}%). Any 2/3 resolution will be postponed until this is reached.</div>`;
+    banner = `<div class="banner bad">${t('checkin.banner.short', presentCount, fmt(q.P), fmt(q.T), fmt(Math.ceil(q.threshold)), (State.data.settings.quorumFraction*100).toFixed(1))}</div>`;
   }
 
   const cards = owners.map(o => {
@@ -803,18 +1296,18 @@ checkin(s) {
         <div class="num">#${o.houseNumber}</div>
         <div class="grow">
           <div class="name">${esc(o.displayName||o.owner||'—')}</div>
-          <div class="frac">Fraction ${o.fraction}</div>
+          <div class="frac">${esc(t('checkin.card.fraction', o.fraction))}</div>
           ${!a.present ? `
             <div style="margin-top:4px">
               <select data-action="set-proxy" data-id="${o.houseNumber}" style="font-size:13px; min-height:32px; padding: 4px 6px">
-                <option value="">— No proxy —</option>
+                <option value="">${esc(t('checkin.no_proxy'))}</option>
                 ${proxyOptions}
               </select>
-              ${isProxied ? `<div class="proxy-via">✓ Voting via house #${a.proxy}</div>` : ''}
+              ${isProxied ? `<div class="proxy-via">${esc(t('checkin.proxy_via', a.proxy))}</div>` : ''}
             </div>` : ''}
         </div>
         <div class="ctrl">
-          <input type="checkbox" class="switch" data-action="toggle-present" data-id="${o.houseNumber}" ${a.present?'checked':''} title="Present">
+          <input type="checkbox" class="switch" data-action="toggle-present" data-id="${o.houseNumber}" ${a.present?'checked':''} title="${esc(t('checkin.present_title'))}">
         </div>
       </div>
     `;
@@ -823,17 +1316,17 @@ checkin(s) {
   return `
     <div class="card" style="position:sticky; top:80px; z-index:5">
       <div class="quorum-bar ${q.reached?'':'short'}">
-        <div><b>${presentCount}</b> / ${owners.length} owners</div>
-        <div>Fraction <b>${fmt(q.P)}</b> / ${fmt(q.T)}</div>
+        <div>${t('checkin.owners_label', presentCount, owners.length)}</div>
+        <div>${t('checkin.fraction_label', fmt(q.P), fmt(q.T))}</div>
         <div class="progress"><div style="width:${pct}%"></div></div>
         <div>${pct}%</div>
-        <div>${has2_3 ? (q.reached ? `<span class="badge ok">2/3 quorum ✓</span>` : `<span class="badge bad">Need ${fmt(Math.ceil(q.threshold))}</span>`) : `<span class="badge muted">No 2/3 required</span>`}</div>
+        <div>${has2_3 ? (q.reached ? `<span class="badge ok">${esc(t('checkin.badge.reached'))}</span>` : `<span class="badge bad">${esc(t('checkin.badge.need', fmt(Math.ceil(q.threshold))))}</span>`) : `<span class="badge muted">${esc(t('checkin.badge.no23'))}</span>`}</div>
       </div>
     </div>
     ${banner}
     <div class="row">
-      <input type="text" id="search-owner" placeholder="Search by house #, owner..." value="${esc(State.checkInSearch || '')}" oninput="State.checkInSearch=this.value; App.filterOwners(this.value)" class="grow">
-      <button class="btn btn-primary" data-action="start-voting">Start voting →</button>
+      <input type="text" id="search-owner" placeholder="${esc(t('checkin.search_placeholder'))}" value="${esc(State.checkInSearch || '')}" oninput="State.checkInSearch=this.value; App.filterOwners(this.value)" class="grow">
+      <button class="btn btn-primary" data-action="start-voting">${esc(t('checkin.start_voting'))}</button>
     </div>
     <div class="owners-grid" id="owners-grid" style="margin-top:14px">${cards}</div>
   `;
@@ -856,18 +1349,18 @@ voteEntry(s) {
     const done = v && s.resolutions.every(r => v[r.id]);
     const heldBy = Calc.voteHeldBy(s, o.houseNumber);
     const isProxy = heldBy && heldBy !== o.houseNumber;
-    return `<button class="${done?'done':''} ${isProxy?'proxy':''}" data-action="pick-ballot" data-id="${o.houseNumber}">${o.houseNumber}${isProxy?` <span class="small">(via #${heldBy})</span>`:''}${done?' ✓':''}</button>`;
+    return `<button class="${done?'done':''} ${isProxy?'proxy':''}" data-action="pick-ballot" data-id="${o.houseNumber}">${o.houseNumber}${isProxy?` <span class="small">${esc(t('vote.via_short', heldBy))}</span>`:''}${done?' ✓':''}</button>`;
   }).join('');
 
   return `
     <div class="card">
       <div class="row">
-        <h2 style="margin:0">Enter ballots</h2>
-        <span class="pill">${ballotsDone} / ${voters.length} done</span>
+        <h2 style="margin:0">${esc(t('vote.h2'))}</h2>
+        <span class="pill">${esc(t('vote.progress', ballotsDone, voters.length))}</span>
         <div class="spacer grow"></div>
-        <button class="btn" data-action="session-tab" data-tab="results">View results →</button>
+        <button class="btn" data-action="session-tab" data-tab="results">${esc(t('vote.view_results'))}</button>
       </div>
-      <p class="muted">Pick a house number to enter or edit that ballot. Houses with ✓ already have all resolutions filled. <b>Proxied</b> ballots (blue) are cast by another house.</p>
+      <p class="muted">${t('vote.pick_help')}</p>
       <div class="ballot-picker">${buttons}</div>
     </div>
   `;
@@ -875,22 +1368,22 @@ voteEntry(s) {
 
 voteForm(s, houseNumber, voters) {
   const owner = Calc.ownerByHouse(State.data.owners, houseNumber);
-  if (!owner) return `<p>Unknown house.</p>`;
+  if (!owner) return `<p>${esc(t('vote.unknown_house'))}</p>`;
   const v = s.votes[houseNumber] || {};
   const heldBy = Calc.voteHeldBy(s, houseNumber);
   const proxyNote = heldBy && heldBy !== houseNumber
-    ? `<div class="banner warn">This ballot is cast by proxy holder house #${heldBy}.</div>` : '';
+    ? `<div class="banner warn">${esc(t('vote.proxy_note', heldBy))}</div>` : '';
 
   const blocks = s.resolutions.map((r, i) => {
     const cur = v[r.id] || '';
     return `
       <div class="resolution-block">
-        <div><b>${esc(r.title)}</b> ${r.requires2_3?'<span class="badge warn">2/3</span>':''}</div>
+        <div><b>${esc(r.title)}</b> ${r.requires2_3?`<span class="badge warn">${esc(t('vote.badge.requires_2_3'))}</span>`:''}</div>
         <div class="small muted">${esc((r.description||'').slice(0,260))}${(r.description||'').length>260?'…':''}</div>
         <div class="vote-buttons" style="margin-top:10px">
-          <button class="agree ${cur==='agree'?'sel':''}" data-action="cast-vote" data-id="${houseNumber}" data-res="${r.id}" data-val="agree">Agree</button>
-          <button class="disagree ${cur==='disagree'?'sel':''}" data-action="cast-vote" data-id="${houseNumber}" data-res="${r.id}" data-val="disagree">Disagree</button>
-          <button class="majority ${cur==='majority'?'sel':''}" data-action="cast-vote" data-id="${houseNumber}" data-res="${r.id}" data-val="majority">With Majority</button>
+          <button class="agree ${cur==='agree'?'sel':''}" data-action="cast-vote" data-id="${houseNumber}" data-res="${r.id}" data-val="agree">${esc(t('vote.btn.agree'))}</button>
+          <button class="disagree ${cur==='disagree'?'sel':''}" data-action="cast-vote" data-id="${houseNumber}" data-res="${r.id}" data-val="disagree">${esc(t('vote.btn.disagree'))}</button>
+          <button class="majority ${cur==='majority'?'sel':''}" data-action="cast-vote" data-id="${houseNumber}" data-res="${r.id}" data-val="majority">${esc(t('vote.btn.majority'))}</button>
         </div>
       </div>
     `;
@@ -899,17 +1392,17 @@ voteForm(s, houseNumber, voters) {
   return `
     <div class="card">
       <div class="row" style="flex-wrap:nowrap; align-items:center; gap:12px">
-        <button class="btn" data-action="back-to-picker" style="flex-shrink:0">← Back to list</button>
+        <button class="btn" data-action="back-to-picker" style="flex-shrink:0">${esc(t('vote.back_to_list'))}</button>
         <div style="min-width:0; flex:1">
-          <h2 style="margin:0">Ballot — House #${houseNumber}</h2>
-          <div class="muted small">${esc(owner.displayName)} · fraction ${owner.fraction}</div>
+          <h2 style="margin:0">${esc(t('vote.ballot_h2', houseNumber))}</h2>
+          <div class="muted small">${esc(owner.displayName)} ${esc(t('vote.fraction_inline', owner.fraction))}</div>
         </div>
-        <button class="btn" data-action="clear-ballot" data-id="${houseNumber}" style="flex-shrink:0">Clear ballot</button>
+        <button class="btn" data-action="clear-ballot" data-id="${houseNumber}" style="flex-shrink:0">${esc(t('vote.clear'))}</button>
       </div>
       ${proxyNote}
       ${blocks}
       <div class="row" style="margin-top:14px">
-        <button class="btn btn-primary btn-big" data-action="back-to-picker">Done — back to list</button>
+        <button class="btn btn-primary btn-big" data-action="back-to-picker">${esc(t('vote.done'))}</button>
       </div>
     </div>
   `;
@@ -919,35 +1412,46 @@ results(s) {
   const owners = State.data.owners;
   const q = Calc.quorumReached(s, owners, State.data.settings);
   const has2_3 = s.resolutions.some(r => r.requires2_3);
-  if (s.resolutions.length === 0) return `<p class="muted">No resolutions to score yet.</p>`;
+  if (s.resolutions.length === 0) return `<p class="muted">${esc(t('results.no_resolutions'))}</p>`;
   const blocks = s.resolutions.map((r, i) => {
     const out = Calc.resolutionVerdict(s, owners, State.data.settings, r);
-    const { tally, verdict, reason, winnerSide, winningTotal } = out;
+    const { tally, verdict, reasonCode, reasonData, winnerSide, winningTotal } = out;
     const total = Math.max(q.T, tally.cast);
-    const seg = (val, cls, label) => val > 0 ? `<div class="seg ${cls}" style="width:${(val/total)*100}%" title="${label}">${fmt(val)}</div>` : '';
+    const seg = (val, cls, label) => val > 0 ? `<div class="seg ${cls}" style="width:${(val/total)*100}%" title="${esc(label)}">${fmt(val)}</div>` : '';
     const absent = Math.max(0, q.T - tally.cast);
+    // Translate the reason at render time
+    let reasonText = '';
+    if (reasonCode === 'quorum_not_reached') reasonText = t('results.reason.quorum_not_reached');
+    else if (reasonCode === 'no_votes') reasonText = t('results.reason.no_votes');
+    else if (reasonCode === 'agree_2_3_pass') reasonText = t('results.reason.agree_2_3_pass', fmt(winningTotal), t('results.tb.' + reasonData.baseKey), fmt(reasonData.base), reasonData.threshold.toFixed(2));
+    else if (reasonCode === 'agree_2_3_fail') reasonText = t('results.reason.agree_2_3_fail', fmt(winningTotal), t('results.tb.' + reasonData.baseKey), fmt(reasonData.base), reasonData.threshold.toFixed(2));
+    else if (reasonCode === 'disagree_leads') reasonText = t('results.reason.disagree_leads', fmt(tally.D + tally.M), fmt(tally.A));
+    else if (reasonCode === 'agree_wins') reasonText = t('results.reason.agree_wins', fmt(winningTotal), fmt(tally.D));
+    else if (reasonCode === 'disagree_wins') reasonText = t('results.reason.disagree_wins', fmt(winningTotal), fmt(tally.A));
+    else if (reasonCode === 'tied') reasonText = t('results.reason.tied', fmt(tally.A), fmt(tally.D));
+    const localSide = t('results.side.' + winnerSide);
     return `
       <div class="result-card ${verdict.toLowerCase()}">
         <div class="row">
           <h3 style="margin:0">${esc(r.title)}</h3>
-          ${r.requires2_3?'<span class="badge warn">2/3 required</span>':''}
+          ${r.requires2_3?`<span class="badge warn">${esc(t('results.requires_2_3'))}</span>`:''}
           <div class="spacer grow"></div>
-          <span class="verdict">${verdict}</span>
+          <span class="verdict">${esc(t('results.verdict.' + verdict))}</span>
         </div>
-        <p class="muted small">${esc(reason)}</p>
+        <p class="muted small">${esc(reasonText)}</p>
         <div class="stacked-bar" style="margin-top:8px">
-          ${seg(tally.A, 'agree', 'Agree')}
-          ${seg(tally.M, 'majority', 'With Majority')}
-          ${seg(tally.D, 'disagree', 'Disagree')}
-          ${seg(absent, 'absent', 'Absent / not voted')}
+          ${seg(tally.A, 'agree', t('results.bar.agree'))}
+          ${seg(tally.M, 'majority', t('results.bar.majority'))}
+          ${seg(tally.D, 'disagree', t('results.bar.disagree'))}
+          ${seg(absent, 'absent', t('results.bar.absent'))}
         </div>
         <div class="kv small" style="margin-top:10px">
-          <b>Agree</b><span>${fmt(tally.A)}</span>
-          <b>Disagree</b><span>${fmt(tally.D)}</span>
-          <b>With Majority</b><span>${fmt(tally.M)}</span>
-          <b>Participation</b><span>${fmt(tally.cast)} of ${fmt(q.T)}</span>
-          <b>Winning side</b><span>${winnerSide} (total ${fmt(winningTotal)})</span>
-          ${r.requires2_3?`<b>2/3 threshold</b><span>${((r.thresholdBase==='cast'?tally.cast:r.thresholdBase==='total'?q.T:q.P) * 2/3).toFixed(2)} (of ${r.thresholdBase||'present'})</span>`:''}
+          <b>${esc(t('results.kv.agree'))}</b><span>${fmt(tally.A)}</span>
+          <b>${esc(t('results.kv.disagree'))}</b><span>${fmt(tally.D)}</span>
+          <b>${esc(t('results.kv.majority'))}</b><span>${fmt(tally.M)}</span>
+          <b>${esc(t('results.kv.participation'))}</b><span>${esc(t('results.kv.participation_value', fmt(tally.cast), fmt(q.T)))}</span>
+          <b>${esc(t('results.kv.winning'))}</b><span>${esc(t('results.kv.winning_value', localSide, fmt(winningTotal)))}</span>
+          ${r.requires2_3?`<b>${esc(t('results.kv.threshold'))}</b><span>${esc(t('results.kv.threshold_value', ((r.thresholdBase==='cast'?tally.cast:r.thresholdBase==='total'?q.T:q.P) * 2/3).toFixed(2), t('results.tb.' + (r.thresholdBase || 'present'))))}</span>`:''}
         </div>
       </div>
     `;
@@ -956,13 +1460,13 @@ results(s) {
   return `
     <div class="card">
       <div class="row">
-        <h2 style="margin:0">Results</h2>
-        ${has2_3 ? `<span class="badge ${q.reached?'ok':'bad'}">${q.reached?'2/3 quorum reached':'2/3 quorum NOT reached'}</span>` : `<span class="badge muted">No 2/3 required</span>`}
+        <h2 style="margin:0">${esc(t('results.h2'))}</h2>
+        ${has2_3 ? `<span class="badge ${q.reached?'ok':'bad'}">${esc(q.reached?t('results.badge.reached'):t('results.badge.not_reached'))}</span>` : `<span class="badge muted">${esc(t('results.badge.no23'))}</span>`}
         <div class="spacer grow"></div>
-        <button class="btn" data-action="export-csv">Save votes as spreadsheet (CSV)</button>
-        ${s.status !== 'closed' ? `<button class="btn btn-ok" data-action="close-session">Close session</button>` : `<span class="badge ok">CLOSED</span>`}
+        <button class="btn" data-action="export-csv">${esc(t('results.save_csv'))}</button>
+        ${s.status !== 'closed' ? `<button class="btn btn-ok" data-action="close-session">${esc(t('results.close_session'))}</button>` : `<span class="badge ok">${esc(t('results.closed'))}</span>`}
       </div>
-      <p class="muted small">Present fraction: <b>${fmt(q.P)}</b> of ${fmt(q.T)} (${q.T?Math.round(q.P/q.T*100):0}%).${has2_3 ? ` 2/3 threshold: ${fmt(Math.ceil(q.threshold))}.` : ''}</p>
+      <p class="muted small">${has2_3 ? t('results.summary_with_threshold', fmt(q.P), fmt(q.T), (q.T?Math.round(q.P/q.T*100):0), fmt(Math.ceil(q.threshold))) : t('results.summary', fmt(q.P), fmt(q.T), (q.T?Math.round(q.P/q.T*100):0))}</p>
     </div>
     ${blocks}
   `;
@@ -971,18 +1475,18 @@ results(s) {
 audit(s) {
   const rows = (s.auditLog || []).slice().reverse().map(e => `
     <div class="audit-row">
-      <span class="muted small">${esc(new Date(e.ts).toLocaleString())}</span>
+      <span class="muted small">${esc(formatTimestamp(e.ts))}</span>
       <code>${esc(e.action)}</code>
       <span>${esc(JSON.stringify(e.payload))}</span>
     </div>
-  `).join('') || `<p class="muted">No events yet.</p>`;
+  `).join('') || `<p class="muted">${esc(t('audit.no_events'))}</p>`;
   return `
     <div class="card">
       <div class="row">
-        <h2 style="margin:0">Audit log</h2>
-        <span class="muted small">${(s.auditLog||[]).length} events</span>
+        <h2 style="margin:0">${esc(t('audit.h2'))}</h2>
+        <span class="muted small">${esc(t('audit.events', (s.auditLog||[]).length))}</span>
         <div class="spacer grow"></div>
-        <button class="btn" data-action="export-audit-csv">Save log as spreadsheet (CSV)</button>
+        <button class="btn" data-action="export-audit-csv">${esc(t('audit.save_csv'))}</button>
       </div>
       ${rows}
     </div>
@@ -991,31 +1495,31 @@ audit(s) {
 
 importExport() {
   return `
-    <h1>Save / Load all data</h1>
+    <h1>${esc(t('io.h1'))}</h1>
     <div class="card">
-      <h3 style="margin-top:0">Save everything to a file</h3>
-      <p>Saves all owners, all sessions, and settings as one file. Keep it somewhere safe (USB stick, Dropbox, email to yourself).</p>
-      <button class="btn btn-primary btn-big" data-action="download-backup">Save everything to a file</button>
+      <h3 style="margin-top:0">${esc(t('io.save.h3'))}</h3>
+      <p>${esc(t('io.save.p'))}</p>
+      <button class="btn btn-primary btn-big" data-action="download-backup">${esc(t('io.save.btn'))}</button>
     </div>
     <div class="card">
-      <h3 style="margin-top:0">Load everything from a file</h3>
-      <p>Replaces all current data with what's in the chosen file. <b>You will lose anything not in the file.</b></p>
+      <h3 style="margin-top:0">${esc(t('io.load.h3'))}</h3>
+      <p>${t('io.load.p')}</p>
       <div class="row" style="margin-top:10px">
-        <label class="btn btn-big" for="restore-file">Choose a file…</label>
-        <input type="file" id="restore-file" accept="application/json" style="display:none" onchange="document.getElementById('restore-file-name').textContent = this.files[0] ? this.files[0].name : 'No file chosen'; document.getElementById('restore-file-msg').textContent = '';">
-        <span id="restore-file-name" class="muted">No file chosen</span>
+        <label class="btn btn-big" for="restore-file">${esc(t('io.load.choose'))}</label>
+        <input type="file" id="restore-file" accept="application/json" style="display:none" oninput="App.onRestoreFilePicked(this)">
+        <span id="restore-file-name" class="muted">${esc(t('btn.no_file_chosen'))}</span>
       </div>
       <div style="margin-top:14px">
-        <button class="btn btn-danger btn-big" data-action="restore-backup">Load from the selected file</button>
+        <button class="btn btn-danger btn-big" data-action="restore-backup">${esc(t('io.load.btn'))}</button>
         <div id="restore-file-msg" class="small" style="color: var(--bad); margin-top: 8px; min-height: 20px;"></div>
       </div>
     </div>
     <div class="card">
-      <h3 style="margin-top:0">Reset everything</h3>
-      <p>Deletes all sessions and resets owners to the original list. Save a backup first if you might need this data later.</p>
-      <button class="btn btn-danger" data-action="factory-reset">Reset everything</button>
+      <h3 style="margin-top:0">${esc(t('io.reset.h3'))}</h3>
+      <p>${esc(t('io.reset.p'))}</p>
+      <button class="btn btn-danger" data-action="factory-reset">${esc(t('io.reset.btn'))}</button>
     </div>
-    <button class="btn btn-link" data-action="goto-home">← Back</button>
+    <button class="btn btn-link" data-action="goto-home">${esc(t('btn.back'))}</button>
   `;
 }
 
@@ -1042,26 +1546,54 @@ const App = {
       case 'importexport': html = Views.importExport(); break;
     }
     app.innerHTML = html;
-    App.updateCrumb();
+    App.updateChrome();
     Saved.render();
     // Re-apply check-in search filter after each render so toggles don't reset it
     if (State.view === 'session' && State.sessionView === 'checkin' && State.checkInSearch) {
       App.filterOwners(State.checkInSearch);
     }
   },
-  updateCrumb() {
-    const c = document.getElementById('crumb');
+  // Update sticky header bits that live outside <#app> (logo title, ← Home, crumb, lang switch).
+  updateChrome() {
+    const logo = document.getElementById('logo');
+    if (logo) logo.title = t('logo.title');
     const hb = document.getElementById('home-btn');
-    let p = '';
-    if (State.view === 'home') p = 'Meetings';
-    else if (State.view === 'owners') p = 'Owners';
-    else if (State.view === 'new') p = 'New session';
-    else if (State.view === 'session') {
-      const s = Actions.getSession(State.params.id);
-      p = s ? `${s.title} — ${State.sessionView}` : 'Session';
-    } else if (State.view === 'importexport') p = 'Save / Load all data';
-    c.textContent = p;
-    if (hb) hb.style.display = State.view === 'home' ? 'none' : '';
+    if (hb) {
+      hb.textContent = t('btn.home');
+      hb.style.display = State.view === 'home' ? 'none' : '';
+    }
+    const langSwitch = document.getElementById('lang-switch');
+    if (langSwitch) {
+      langSwitch.title = t('lang.switch_title');
+      langSwitch.querySelectorAll('button').forEach(b => {
+        b.classList.toggle('active', b.dataset.lang === State.lang);
+      });
+    }
+    const c = document.getElementById('crumb');
+    if (c) {
+      let p = '';
+      if (State.view === 'home') p = t('crumb.home');
+      else if (State.view === 'owners') p = t('crumb.owners');
+      else if (State.view === 'new') p = t('crumb.new');
+      else if (State.view === 'session') {
+        const s = Actions.getSession(State.params.id);
+        const tabName = t('tab.' + State.sessionView) || State.sessionView;
+        p = s ? `${s.title} — ${tabName}` : t('crumb.session_session');
+      } else if (State.view === 'importexport') p = t('crumb.io');
+      c.textContent = p;
+    }
+  },
+  // Helper for the New session date picker — reads State.lang for the long format
+  updateNewDatePretty(v) {
+    const el = document.getElementById('new-date-pretty');
+    if (el) el.textContent = formatDateLong(v);
+  },
+  // Helper for the file-picker label on the Save/Load screen
+  onRestoreFilePicked(input) {
+    const nm = document.getElementById('restore-file-name');
+    const msg = document.getElementById('restore-file-msg');
+    if (nm) nm.textContent = input.files[0] ? input.files[0].name : t('btn.no_file_chosen');
+    if (msg) msg.textContent = '';
   },
   go(view, params = {}) { State.view = view; State.params = params; State.voteHouse = null; State.checkInSearch = ''; App.render(); window.scrollTo(0,0); },
   goSession(id, tab='setup') { State.view = 'session'; State.params = { id }; State.sessionView = tab; State.voteHouse = null; State.checkInSearch = ''; App.render(); window.scrollTo(0,0); },
@@ -1071,10 +1603,10 @@ const App = {
     if (!ev.target.closest('details.kebab')) {
       document.querySelectorAll('details.kebab[open]').forEach(d => d.removeAttribute('open'));
     }
-    const t = ev.target.closest('[data-action]');
-    if (!t) return;
-    const a = t.dataset.action;
-    const id = t.dataset.id;
+    const el = ev.target.closest('[data-action]');
+    if (!el) return;
+    const a = el.dataset.action;
+    const id = el.dataset.id;
     // If the click was on a kebab menu item, close the menu
     if (ev.target.closest('.kebab-menu')) {
       const k = ev.target.closest('details.kebab');
@@ -1084,45 +1616,46 @@ const App = {
     if (State.view === 'session') {
       const s = Actions.getSession(State.params.id);
       if (s && s.status === 'closed') {
-        const allowed = new Set(['goto-home','goto-owners','goto-importexport','session-tab','reopen-session','export-csv','export-audit-csv','back-to-picker','pick-ballot']);
-        if (!allowed.has(a)) { toast('Session is closed — reopen to edit', 'warn'); return; }
+        const allowed = new Set(['goto-home','goto-owners','goto-importexport','session-tab','reopen-session','export-csv','export-audit-csv','back-to-picker','pick-ballot','set-lang']);
+        if (!allowed.has(a)) { toast(t('toast.session_locked'), 'warn'); return; }
       }
     }
     const fns = {
+      'set-lang': () => { State.setLang(el.dataset.lang); App.render(); },
       'goto-home': () => App.go('home'),
       'goto-owners': () => App.go('owners'),
       'goto-new': () => App.go('new'),
       'goto-importexport': () => App.go('importexport'),
       'open-session': () => App.goSession(id, 'setup'),
       'view-audit': () => App.goSession(id, 'audit'),
-      'delete-session': () => { if (confirmModal('Delete this session permanently?')) { Actions.deleteSession(id); App.render(); toast('Session deleted'); } },
-      'session-tab': () => { State.sessionView = t.dataset.tab; State.voteHouse = null; App.render(); window.scrollTo(0,0); },
+      'delete-session': () => { if (confirmModal(t('confirm.delete_session'))) { Actions.deleteSession(id); App.render(); toast(t('toast.session_deleted')); } },
+      'session-tab': () => { State.sessionView = el.dataset.tab; State.voteHouse = null; App.render(); window.scrollTo(0,0); },
       'create-session': () => {
-        const title = document.getElementById('new-title').value.trim() || 'VVE Meeting';
+        const title = document.getElementById('new-title').value.trim() || t('default.session_title');
         const date = document.getElementById('new-date').value;
         const s = Actions.newSession(title, date);
         App.goSession(s.id, 'setup');
       },
       'add-owner': () => {
         const nextHouse = Math.max(...State.data.owners.map(o=>+o.houseNumber).filter(n=>n<99999), 400) + 1;
-        State.data.owners.push({ houseNumber: nextHouse, buildingNumber: null, fraction: 0, owner: '', displayName: 'New owner' });
+        State.data.owners.push({ houseNumber: nextHouse, buildingNumber: null, fraction: 0, owner: '', displayName: t('default.new_owner') });
         State.persist(); App.render();
       },
       'delete-owner': () => {
-        if (!confirmModal(`Delete owner #${id}? Total fraction will change.`)) return;
+        if (!confirmModal(t('confirm.delete_owner', id))) return;
         State.data.owners = State.data.owners.filter(o => String(o.houseNumber) !== String(id));
         State.persist(); App.render();
       },
       'add-res': () => {
         const s = Actions.getSession(State.params.id);
         Actions.updateSession(s, ss => {
-          ss.resolutions.push({ id: uid(), title: 'New resolution', description: '', requires2_3: false, thresholdBase: 'present' });
+          ss.resolutions.push({ id: uid(), title: t('default.new_resolution'), description: '', requires2_3: false, thresholdBase: 'present' });
           Audit.log(ss, 'resolution.add', { count: ss.resolutions.length });
         });
         App.render();
       },
       'delete-res': () => {
-        if (!confirmModal('Delete this resolution?')) return;
+        if (!confirmModal(t('confirm.delete_resolution'))) return;
         const s = Actions.getSession(State.params.id);
         Actions.updateSession(s, ss => {
           ss.resolutions = ss.resolutions.filter(r => r.id !== id);
@@ -1132,7 +1665,7 @@ const App = {
         App.render();
       },
       'move-res': () => {
-        const dir = parseInt(t.dataset.dir, 10);
+        const dir = parseInt(el.dataset.dir, 10);
         const s = Actions.getSession(State.params.id);
         Actions.updateSession(s, ss => {
           const i = ss.resolutions.findIndex(r => r.id === id);
@@ -1153,19 +1686,19 @@ const App = {
         if (!q.reached) {
           const has2_3 = s.resolutions.some(r => r.requires2_3);
           const msg = has2_3
-            ? `Quorum (2/3 presence) is NOT reached: ${fmt(q.P)} of ${fmt(q.T)}.\n\nAny resolutions requiring 2/3 majority will be marked POSTPONED. Simple-majority resolutions can still be decided.\n\nYou can always come back to update attendance. Start voting?`
-            : `Quorum (2/3 presence) is NOT reached: ${fmt(q.P)} of ${fmt(q.T)}.\n\nNo resolutions require 2/3, so this is fine. Start voting?`;
+            ? t('confirm.start_voting_no_quorum_with23', fmt(q.P), fmt(q.T))
+            : t('confirm.start_voting_no_quorum_simple', fmt(q.P), fmt(q.T));
           if (!confirmModal(msg)) return;
         }
         Actions.updateSession(s, ss => { ss.status = 'voting'; Audit.log(ss, 'voting.start', { presentFraction: q.P, quorumReached: q.reached }); });
         State.sessionView = 'vote';
         App.render();
-        toast('Voting started');
+        toast(t('toast.voting_started'));
       },
       'pick-ballot': () => { State.voteHouse = +id; App.render(); window.scrollTo(0,0); },
       'back-to-picker': () => { State.voteHouse = null; App.render(); },
       'cast-vote': () => {
-        const res = t.dataset.res, val = t.dataset.val, house = +t.dataset.id;
+        const res = el.dataset.res, val = el.dataset.val, house = +el.dataset.id;
         const s = Actions.getSession(State.params.id);
         Actions.updateSession(s, ss => {
           if (!ss.votes[house]) ss.votes[house] = {};
@@ -1176,7 +1709,7 @@ const App = {
         App.render();
       },
       'clear-ballot': () => {
-        if (!confirmModal(`Clear all votes for house #${id}?`)) return;
+        if (!confirmModal(t('confirm.clear_ballot', id))) return;
         const s = Actions.getSession(State.params.id);
         Actions.updateSession(s, ss => {
           const old = ss.votes[id];
@@ -1186,18 +1719,18 @@ const App = {
         App.render();
       },
       'close-session': () => {
-        if (!confirmModal('Close this session? It becomes read-only. You can reopen any time to make corrections.')) return;
+        if (!confirmModal(t('confirm.close_session'))) return;
         const s = Actions.getSession(State.params.id);
         Actions.updateSession(s, ss => { ss.priorStatus = ss.status; ss.status = 'closed'; ss.closedAt = new Date().toISOString(); Audit.log(ss, 'session.close', {}); });
         App.render();
-        toast('Session closed (read-only)');
+        toast(t('toast.session_closed'));
       },
       'reopen-session': () => {
         const s = Actions.getSession(State.params.id);
-        if (!confirmModal('Reopen this session for editing? This will be recorded in the audit log.')) return;
+        if (!confirmModal(t('confirm.reopen_session'))) return;
         Actions.updateSession(s, ss => { ss.status = ss.priorStatus || 'voting'; ss.closedAt = null; Audit.log(ss, 'session.reopen', {}); });
         App.render();
-        toast('Session reopened');
+        toast(t('toast.session_reopened'));
       },
       'export-csv': () => App.exportCSV(),
       'export-session-by-id': () => {
@@ -1209,29 +1742,29 @@ const App = {
       'download-backup': () => App.downloadBackup(),
       'restore-backup': () => App.restoreBackup(),
       'factory-reset': () => {
-        if (!confirmModal('Delete ALL sessions and reset owners to the original list? This cannot be undone.')) return;
+        if (!confirmModal(t('confirm.factory_reset'))) return;
         Storage.reset();
         State.init();
         App.go('home');
-        toast('Everything has been reset');
+        toast(t('toast.everything_reset'));
       }
     };
     if (fns[a]) fns[a]();
   },
 
   onChange(ev) {
-    const t = ev.target;
+    const el = ev.target;
     // Duplicate-house-number guard (fires on blur for the Owners table input)
-    if (t.dataset.editOwner && t.dataset.field === 'houseNumber') {
-      const initial = t.dataset.initialValue;
-      const newNum = t.value === '' ? '' : Number(t.value);
+    if (el.dataset.editOwner && el.dataset.field === 'houseNumber') {
+      const initial = el.dataset.initialValue;
+      const newNum = el.value === '' ? '' : Number(el.value);
       if (newNum !== '' && String(newNum) !== String(initial)) {
         const dup = State.data.owners.filter(o => String(o.houseNumber) === String(newNum));
         if (dup.length > 1) {
-          alert(`House #${newNum} is already used by another owner. Reverting to ${initial}.`);
+          alert(t('alert.duplicate_house', newNum, initial));
           const owner = State.data.owners.find(o => String(o.houseNumber) === String(newNum) && o !== dup[0]);
           if (owner) owner.houseNumber = initial === '' ? null : Number(initial);
-          t.value = initial;
+          el.value = initial;
           State.persist();
           App.render();
           return;
@@ -1239,29 +1772,29 @@ const App = {
       }
     }
     // Single audit log entry on commit for session/resolution edits
-    if ((t.dataset.editSession || t.dataset.editRes) && State.view === 'session') {
+    if ((el.dataset.editSession || el.dataset.editRes) && State.view === 'session') {
       const s = Actions.getSession(State.params.id);
       if (s && s.status !== 'closed') {
-        const initial = t.dataset.initialValue;
-        const cur = t.type === 'checkbox' ? String(t.checked) : t.value;
+        const initial = el.dataset.initialValue;
+        const cur = el.type === 'checkbox' ? String(el.checked) : el.value;
         if (initial !== undefined && initial !== cur) {
-          if (t.dataset.editSession) {
-            Audit.log(s, 'session.edit', { field: t.dataset.editSession, old: initial, val: cur });
+          if (el.dataset.editSession) {
+            Audit.log(s, 'session.edit', { field: el.dataset.editSession, old: initial, val: cur });
           } else {
-            Audit.log(s, 'resolution.edit', { id: t.dataset.editRes, field: t.dataset.field, old: initial, val: cur });
+            Audit.log(s, 'resolution.edit', { id: el.dataset.editRes, field: el.dataset.field, old: initial, val: cur });
           }
           State.persist();
         }
       }
-      delete t.dataset.initialValue;
+      delete el.dataset.initialValue;
     }
     // Guard: closed sessions are read-only for attendance/proxy changes
-    if ((t.dataset.action === 'toggle-present' || t.dataset.action === 'set-proxy') && State.view === 'session') {
+    if ((el.dataset.action === 'toggle-present' || el.dataset.action === 'set-proxy') && State.view === 'session') {
       const s = Actions.getSession(State.params.id);
       if (s && s.status === 'closed') { App.render(); return; }
     }
-    if (t.dataset.action === 'import-owners-file') {
-      const f = t.files[0]; if (!f) return;
+    if (el.dataset.action === 'import-owners-file') {
+      const f = el.files[0]; if (!f) return;
       const reader = new FileReader();
       reader.onload = () => {
         try {
@@ -1277,14 +1810,14 @@ const App = {
             throw new Error("This file doesn't contain an owners list.");
           }
           if (!owners.length || owners[0].houseNumber === undefined || owners[0].fraction === undefined) {
-            throw new Error("Owners file looks empty or malformed.");
+            throw new Error(t('error.owners_malformed'));
           }
           // If we're replacing existing owners + sessions, confirm
           if (State.data.owners.length || State.data.sessions.length) {
             const msg = isFullBackup
-              ? 'This file is a full backup. It will replace ALL current data (owners and every session). Continue?'
-              : `Replace the current ${State.data.owners.length} owners with ${owners.length} from this file? (Existing sessions are kept.)`;
-            if (!confirmModal(msg)) { t.value = ''; return; }
+              ? t('confirm.full_backup_replace')
+              : t('confirm.replace_owners', State.data.owners.length, owners.length);
+            if (!confirmModal(msg)) { el.value = ''; return; }
           }
           if (isFullBackup) {
             State.data = incoming;
@@ -1294,51 +1827,51 @@ const App = {
           }
           State.persist();
           App.render();
-          toast(`Loaded ${owners.length} owners` + (isFullBackup ? ` and ${incoming.sessions.length} sessions` : ''));
+          toast(isFullBackup ? t('toast.loaded_owners_and_sessions', owners.length, incoming.sessions.length) : t('toast.loaded_owners', owners.length));
         } catch (e) {
-          toast('Could not load file: ' + e.message, 'bad');
+          toast(t('toast.could_not_load', e.message), 'bad');
         }
-        t.value = '';
+        el.value = '';
       };
       reader.readAsText(f);
       return;
     }
-    if (t.dataset.action === 'import-session-file') {
-      const f = t.files[0]; if (!f) return;
+    if (el.dataset.action === 'import-session-file') {
+      const f = el.files[0]; if (!f) return;
       const reader = new FileReader();
       reader.onload = () => {
         try {
           const incoming = JSON.parse(reader.result);
-          if (!incoming || !incoming.resolutions) throw new Error("This doesn't look like a session file.");
+          if (!incoming || !incoming.resolutions) throw new Error(t('error.not_a_session_file'));
           const existingIdx = State.data.sessions.findIndex(s => s.id === incoming.id);
           if (existingIdx >= 0) {
-            if (!confirmModal(`A session called "${State.data.sessions[existingIdx].title}" is already on this device. Replace it with the one in this file?`)) return;
+            if (!confirmModal(t('confirm.replace_session', State.data.sessions[existingIdx].title))) return;
             State.data.sessions[existingIdx] = incoming;
           } else {
             State.data.sessions.unshift(incoming);
           }
           State.persist();
           App.render();
-          toast(`Session "${incoming.title}" opened (${incoming.resolutions.length} resolutions)`);
-        } catch (e) { toast('Could not open file: ' + e.message, 'bad'); }
-        t.value = '';
+          toast(t('toast.session_opened', incoming.title, incoming.resolutions.length));
+        } catch (e) { toast(t('toast.could_not_open', e.message), 'bad'); }
+        el.value = '';
       };
       reader.readAsText(f);
       return;
     }
-    if (t.dataset.action === 'toggle-present') {
-      const house = +t.dataset.id;
+    if (el.dataset.action === 'toggle-present') {
+      const house = +el.dataset.id;
       const s = Actions.getSession(State.params.id);
       Actions.updateSession(s, ss => {
         if (!ss.attendance[house]) ss.attendance[house] = { present: false, proxy: null };
-        ss.attendance[house].present = t.checked;
-        if (t.checked) ss.attendance[house].proxy = null;
-        Audit.log(ss, 'attendance.toggle', { house, present: t.checked });
+        ss.attendance[house].present = el.checked;
+        if (el.checked) ss.attendance[house].proxy = null;
+        Audit.log(ss, 'attendance.toggle', { house, present: el.checked });
       });
       App.render();
-    } else if (t.dataset.action === 'set-proxy') {
-      const house = +t.dataset.id;
-      const proxy = t.value ? +t.value : null;
+    } else if (el.dataset.action === 'set-proxy') {
+      const house = +el.dataset.id;
+      const proxy = el.value ? +el.value : null;
       const s = Actions.getSession(State.params.id);
       Actions.updateSession(s, ss => {
         if (!ss.attendance[house]) ss.attendance[house] = { present: false, proxy: null };
@@ -1350,45 +1883,45 @@ const App = {
   },
 
   onInput(ev) {
-    const t = ev.target;
+    const el = ev.target;
     // Live data updates only — audit log entries are written on commit (in onChange).
-    if ((t.dataset.editRes || t.dataset.editSession) && State.view === 'session') {
+    if ((el.dataset.editRes || el.dataset.editSession) && State.view === 'session') {
       const s = Actions.getSession(State.params.id);
       if (s && s.status === 'closed') return;
     }
-    if (t.dataset.editSession) {
-      const field = t.dataset.editSession;
+    if (el.dataset.editSession) {
+      const field = el.dataset.editSession;
       const s = Actions.getSession(State.params.id);
       if (!s) return;
-      s[field] = t.value;
+      s[field] = el.value;
       s.updatedAt = new Date().toISOString();
       State.persist();
       const h1 = document.querySelector('.app h1');
       if (h1) h1.innerHTML = `${esc(s.title)} <span class="muted small">— ${esc(formatDateLong(s.date) || s.date)}</span>`;
       const pretty = document.getElementById('session-date-pretty');
-      if (pretty && field === 'date') pretty.textContent = formatDateLong(t.value);
-      App.updateCrumb();
+      if (pretty && field === 'date') pretty.textContent = formatDateLong(el.value);
+      App.updateChrome();
       return;
     }
-    if (t.dataset.editOwner) {
-      const house = t.dataset.editOwner;
-      const field = t.dataset.field;
+    if (el.dataset.editOwner) {
+      const house = el.dataset.editOwner;
+      const field = el.dataset.field;
       const o = State.data.owners.find(o => String(o.houseNumber) === String(house));
       if (!o) return;
-      let val = t.value;
+      let val = el.value;
       if (field === 'houseNumber' || field === 'buildingNumber' || field === 'fraction') {
         val = val === '' ? null : Number(val);
       }
       o[field] = val;
       State.persist();
-    } else if (t.dataset.editRes) {
-      const resId = t.dataset.editRes;
-      const field = t.dataset.field;
+    } else if (el.dataset.editRes) {
+      const resId = el.dataset.editRes;
+      const field = el.dataset.field;
       const s = Actions.getSession(State.params.id);
       if (!s) return;
       const r = s.resolutions.find(r => r.id === resId);
       if (!r) return;
-      let val = t.type === 'checkbox' ? t.checked : t.value;
+      let val = el.type === 'checkbox' ? el.checked : el.value;
       r[field] = val;
       s.updatedAt = new Date().toISOString();
       State.persist();
@@ -1397,9 +1930,9 @@ const App = {
   },
 
   onFocusIn(ev) {
-    const t = ev.target;
-    if (t.dataset.editSession || t.dataset.editRes || (t.dataset.editOwner && t.dataset.field === 'houseNumber')) {
-      t.dataset.initialValue = t.type === 'checkbox' ? String(t.checked) : (t.value ?? '');
+    const el = ev.target;
+    if (el.dataset.editSession || el.dataset.editRes || (el.dataset.editOwner && el.dataset.field === 'houseNumber')) {
+      el.dataset.initialValue = el.type === 'checkbox' ? String(el.checked) : (el.value ?? '');
     }
   },
 
@@ -1449,20 +1982,20 @@ const App = {
     const msg = document.getElementById('restore-file-msg');
     const setMsg = (text) => { if (msg) msg.textContent = text; };
     const f = document.getElementById('restore-file').files[0];
-    if (!f) { setMsg('Choose a file first using the button above.'); return; }
+    if (!f) { setMsg(t('error.choose_file_first')); return; }
     setMsg('');
-    if (!confirmModal('This will replace ALL current data (owners and every session) with what is in the file. Continue?')) return;
+    if (!confirmModal(t('confirm.restore_backup'))) return;
     const reader = new FileReader();
     reader.onload = () => {
       try {
         const d = JSON.parse(reader.result);
-        if (!d.owners || !d.sessions) throw new Error("This doesn't look like an all-data file.");
+        if (!d.owners || !d.sessions) throw new Error(t('error.not_an_all_data_file'));
         State.data = d;
         if (!State.data.settings) State.data.settings = { quorumFraction: 2/3, twoThirdsBase: 'present' };
         State.persist();
         App.go('home');
-        toast('Loaded successfully');
-      } catch (e) { setMsg('Could not load file: ' + e.message); }
+        toast(t('toast.loaded_success'));
+      } catch (e) { setMsg(t('toast.could_not_load', e.message)); }
     };
     reader.readAsText(f);
   }
