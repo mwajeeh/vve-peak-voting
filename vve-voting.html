@@ -1291,11 +1291,13 @@ checkin(s) {
     banner = `<div class="banner bad">${t('checkin.banner.short', presentCount, fmt(q.P), fmt(q.T), fmt(Math.ceil(q.threshold)), (State.data.settings.quorumFraction*100).toFixed(1))}</div>`;
   }
 
-  const cards = owners.map(o => {
+  // Sort by house number ascending so the grid reads in a predictable order.
+  const sortedOwners = owners.slice().sort((a, b) => Number(a.houseNumber) - Number(b.houseNumber));
+  const cards = sortedOwners.map(o => {
     const a = s.attendance[o.houseNumber] || {};
     const isProxied = !a.present && a.proxy && s.attendance[a.proxy] && s.attendance[a.proxy].present;
     const cardClass = a.present ? 'present' : (isProxied ? 'proxied' : '');
-    const proxyOptions = owners
+    const proxyOptions = sortedOwners
       .filter(o2 => o2.houseNumber !== o.houseNumber)
       .map(o2 => `<option value="${o2.houseNumber}" ${a.proxy==o2.houseNumber?'selected':''}>#${o2.houseNumber} ${esc((o2.displayName||'').slice(0,40))}</option>`)
       .join('');
