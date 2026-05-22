@@ -476,6 +476,7 @@ const i18n = {
     'vote.key.agree': 'V',
     'vote.key.disagree': 'T',
     'vote.key.majority': 'M',
+    'vote.search_placeholder': 'Zoek huisnummer…',
     // results
     'results.h2': 'Uitslag',
     'results.badge.reached': '2/3-quorum gehaald',
@@ -697,6 +698,7 @@ const i18n = {
     'vote.key.agree': 'A',
     'vote.key.disagree': 'D',
     'vote.key.majority': 'M',
+    'vote.search_placeholder': 'Search house #…',
     'results.h2': 'Results',
     'results.badge.reached': '2/3 quorum reached',
     'results.badge.not_reached': '2/3 quorum NOT reached',
@@ -846,6 +848,7 @@ const State = {
   sessionView: 'setup', // setup | checkin | vote | results | audit
   voteHouse: null,
   checkInSearch: '',
+  voteSearch: '',
   lang: 'nl',           // 'nl' | 'en' — UI language only, never affects vote math
   init() {
     let d = Storage.load();
@@ -1359,7 +1362,7 @@ voteEntry(s) {
     const done = v && s.resolutions.every(r => v[r.id]);
     const heldBy = Calc.voteHeldBy(s, o.houseNumber);
     const isProxy = heldBy && heldBy !== o.houseNumber;
-    return `<button class="${done?'done':''} ${isProxy?'proxy':''}" data-action="pick-ballot" data-id="${o.houseNumber}">${o.houseNumber}${isProxy?` <span class="small">${esc(t('vote.via_short', heldBy))}</span>`:''}${done?' ✓':''}</button>`;
+    return `<button class="${done?'done':''} ${isProxy?'proxy':''}" data-action="pick-ballot" data-id="${o.houseNumber}" data-search="${o.houseNumber}">${o.houseNumber}${isProxy?` <span class="small">${esc(t('vote.via_short', heldBy))}</span>`:''}${done?' ✓':''}</button>`;
   }).join('');
 
   return `
@@ -1371,6 +1374,7 @@ voteEntry(s) {
         <button class="btn" data-action="session-tab" data-tab="results">${esc(t('vote.view_results'))}</button>
       </div>
       <p class="muted">${t('vote.pick_help')}</p>
+      <input type="text" id="search-ballot" placeholder="${esc(t('vote.search_placeholder'))}" value="${esc(State.voteSearch || '')}" oninput="State.voteSearch=this.value; App.filterBallots(this.value)" style="margin:8px 0 12px">
       <div class="ballot-picker">${buttons}</div>
     </div>
   `;
@@ -1560,9 +1564,14 @@ const App = {
     app.innerHTML = html;
     App.updateChrome();
     Saved.render();
-    // Re-apply check-in search filter after each render so toggles don't reset it
+    // Re-apply check-in / vote-picker search filters after each render so a
+    // single vote (which triggers a re-render) doesn't reset the operator's
+    // typed query.
     if (State.view === 'session' && State.sessionView === 'checkin' && State.checkInSearch) {
       App.filterOwners(State.checkInSearch);
+    }
+    if (State.view === 'session' && State.sessionView === 'vote' && !State.voteHouse && State.voteSearch) {
+      App.filterBallots(State.voteSearch);
     }
   },
   // Update sticky header bits that live outside <#app> (logo title, ← Home, crumb, lang switch).
@@ -1607,8 +1616,8 @@ const App = {
     if (nm) nm.textContent = input.files[0] ? input.files[0].name : t('btn.no_file_chosen');
     if (msg) msg.textContent = '';
   },
-  go(view, params = {}) { State.view = view; State.params = params; State.voteHouse = null; State.checkInSearch = ''; App.render(); window.scrollTo(0,0); },
-  goSession(id, tab='setup') { State.view = 'session'; State.params = { id }; State.sessionView = tab; State.voteHouse = null; State.checkInSearch = ''; App.render(); window.scrollTo(0,0); },
+  go(view, params = {}) { State.view = view; State.params = params; State.voteHouse = null; State.checkInSearch = ''; State.voteSearch = ''; App.render(); window.scrollTo(0,0); },
+  goSession(id, tab='setup') { State.view = 'session'; State.params = { id }; State.sessionView = tab; State.voteHouse = null; State.checkInSearch = ''; State.voteSearch = ''; App.render(); window.scrollTo(0,0); },
 
   onClick(ev) {
     // Close any open kebab menu if the click was outside one
@@ -2006,6 +2015,16 @@ const App = {
     [...grid.children].forEach(card => {
       const txt = (card.dataset.search || '').toLowerCase();
       card.style.display = (!q || txt.includes(q)) ? '' : 'none';
+    });
+  },
+
+  filterBallots(q) {
+    q = (q || '').toLowerCase().trim();
+    const picker = document.querySelector('.ballot-picker');
+    if (!picker) return;
+    [...picker.children].forEach(btn => {
+      const txt = (btn.dataset.search || '').toLowerCase();
+      btn.style.display = (!q || txt.includes(q)) ? '' : 'none';
     });
   },
 
