@@ -472,6 +472,10 @@ const i18n = {
     'vote.clear': 'Stembiljet wissen',
     'vote.done': 'Klaar — terug naar lijst',
     'vote.badge.requires_2_3': '2/3',
+    'vote.shortcut_hint': 'Sneltoetsen: druk op <b>V</b> = Voor · <b>T</b> = Tegen · <b>M</b> = Met de meerderheid. Eén toets per voorstel, in volgorde.',
+    'vote.key.agree': 'V',
+    'vote.key.disagree': 'T',
+    'vote.key.majority': 'M',
     // results
     'results.h2': 'Uitslag',
     'results.badge.reached': '2/3-quorum gehaald',
@@ -689,6 +693,10 @@ const i18n = {
     'vote.clear': 'Clear ballot',
     'vote.done': 'Done — back to list',
     'vote.badge.requires_2_3': '2/3',
+    'vote.shortcut_hint': 'Shortcuts: press <b>A</b> = Agree · <b>D</b> = Disagree · <b>M</b> = With Majority. One key per resolution, in order.',
+    'vote.key.agree': 'A',
+    'vote.key.disagree': 'D',
+    'vote.key.majority': 'M',
     'results.h2': 'Results',
     'results.badge.reached': '2/3 quorum reached',
     'results.badge.not_reached': '2/3 quorum NOT reached',
@@ -1377,7 +1385,7 @@ voteForm(s, houseNumber, voters) {
   const blocks = s.resolutions.map((r, i) => {
     const cur = v[r.id] || '';
     return `
-      <div class="resolution-block">
+      <div class="resolution-block" data-res-id="${esc(r.id)}">
         <div><b>${esc(r.title)}</b> ${r.requires2_3?`<span class="badge warn">${esc(t('vote.badge.requires_2_3'))}</span>`:''}</div>
         <div class="small muted">${esc((r.description||'').slice(0,260))}${(r.description||'').length>260?'…':''}</div>
         <div class="vote-buttons" style="margin-top:10px">
@@ -1400,6 +1408,7 @@ voteForm(s, houseNumber, voters) {
         <button class="btn" data-action="clear-ballot" data-id="${houseNumber}" style="flex-shrink:0">${esc(t('vote.clear'))}</button>
       </div>
       ${proxyNote}
+      <div class="small muted" style="margin: 6px 2px 14px">${t('vote.shortcut_hint')}</div>
       ${blocks}
       <div class="row" style="margin-top:14px">
         <button class="btn btn-primary btn-big" data-action="back-to-picker">${esc(t('vote.done'))}</button>
@@ -1533,6 +1542,7 @@ const App = {
     document.body.addEventListener('change', App.onChange);
     document.body.addEventListener('input', App.onInput);
     document.body.addEventListener('focusin', App.onFocusIn);
+    document.body.addEventListener('keydown', App.onKey);
     App.render();
   },
   render() {
@@ -1934,6 +1944,57 @@ const App = {
     if (el.dataset.editSession || el.dataset.editRes || (el.dataset.editOwner && el.dataset.field === 'houseNumber')) {
       el.dataset.initialValue = el.type === 'checkbox' ? String(el.checked) : (el.value ?? '');
     }
+  },
+
+  // Language-aware vote shortcuts. Only fires when a ballot is open and
+  // the user isn't typing into another field. Casts on the first unfilled
+  // resolution, so pressing the same key repeatedly walks down the list.
+  // After each cast the next unfilled resolution (or the Done button) is
+  // smoothly scrolled to the centre of the viewport so the operator never
+  // loses the next target out of the screen.
+  onKey(ev) {
+    if (ev.target && ev.target.matches && ev.target.matches('input,textarea,select')) return;
+    if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    if (State.view !== 'session' || State.sessionView !== 'vote' || !State.voteHouse) return;
+    const map = (State.lang === 'en')
+      ? { a: 'agree', d: 'disagree', m: 'majority' }
+      : { v: 'agree', t: 'disagree', m: 'majority' };
+    const k = ev.key.toLowerCase();
+    if (!map[k]) return;
+    const s = Actions.getSession(State.params.id);
+    if (!s || s.status === 'closed') return;
+    const v = s.votes[State.voteHouse] || {};
+    const next = s.resolutions.find(r => !v[r.id]);
+    if (!next) return;
+    ev.preventDefault();
+    Actions.updateSession(s, ss => {
+      if (!ss.votes[State.voteHouse]) ss.votes[State.voteHouse] = {};
+      ss.votes[State.voteHouse][next.id] = map[k];
+      Audit.log(ss, 'vote.set', { house: State.voteHouse, res: next.id, val: map[k], via: 'kbd' });
+    });
+    App.render();
+    // After render, find the new "first unfilled" and scroll it into view.
+    App.scrollToNextUnfilled();
+  },
+
+  // Smoothly centre the next unfilled resolution in the viewport.
+  // If every resolution is filled, scrolls to the primary "Done" button instead.
+  scrollToNextUnfilled() {
+    const s = Actions.getSession(State.params.id);
+    if (!s) return;
+    const v = s.votes[State.voteHouse] || {};
+    const next = s.resolutions.find(r => !v[r.id]);
+    // Use rAF so the freshly-rendered DOM is queryable before we measure.
+    requestAnimationFrame(() => {
+      if (next) {
+        const cssId = (window.CSS && CSS.escape) ? CSS.escape(next.id) : next.id;
+        const node = document.querySelector(`[data-res-id="${cssId}"]`);
+        if (node) node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        const done = document.querySelector('button.btn-primary[data-action="back-to-picker"]');
+        if (done) done.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
   },
 
   filterOwners(q) {
